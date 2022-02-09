@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+    id 'application'
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+group 'org.stormpx'
+version '1.0'
+
+sourceCompatibility = 17
+
+ext {
+    mainclass = 'org.stormpx.dl.Main'
+}
+
+compileJava.options.encoding = 'UTF-8'
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+application {
+    mainClass = project.ext.mainclass
+}
+
+shadowJar {
+    archiveBaseName.set('m3u8dl')
+    archiveClassifier.set('')
+    archiveVersion.set(project.version)
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': project.ext.mainclass
+    }
+}
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+}
+
+
+
+test {
+    useJUnitPlatform()
+}
