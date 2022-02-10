@@ -21,7 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DLCiphers {
 
     private final static ReentrantLock lock=new ReentrantLock();
-    private final static Map<EncryptInfo,SecretKeySpec> keyMap =new ConcurrentHashMap<>();
+    private final static Map<EncryptInfo, SecretKeyHolder> keyMap =new ConcurrentHashMap<>();
 
     private Cipher createCipher(SecretKeySpec key, IvParameterSpec iv) {
         Cipher cipher = null;
@@ -35,11 +35,12 @@ public class DLCiphers {
     }
 
     public Cipher getCipher(URI baseUri,long sequence,EncryptInfo encryptInfo) throws IOException {
-        SecretKeySpec key = keyMap.get(encryptInfo);
+        SecretKeyHolder keyHolder = keyMap.computeIfAbsent(encryptInfo, k -> new SecretKeyHolder());
+        SecretKeySpec key = keyHolder.getSecretKey();
         if (key==null){
             lock.lock();
             try {
-                key= keyMap.get(encryptInfo);
+                key= keyHolder.getSecretKey();
                 if (key==null){
                     ReqResult reqResult = Http.request(baseUri.resolve(encryptInfo.getUri()), null);
                     if (!reqResult.isSuccess()){
@@ -47,8 +48,9 @@ public class DLCiphers {
                     }
                     byte[] bytes = reqResult.getInputStream().readAllBytes();
                     reqResult.getInputStream().close();
+
                     key=new SecretKeySpec(bytes,"AES");
-                    keyMap.put(encryptInfo,key);
+                    keyHolder.setSecretKey(key);
                 }
             } finally {
                 lock.unlock();
@@ -65,6 +67,24 @@ public class DLCiphers {
         return createCipher(key,new IvParameterSpec(iv));
     }
 
+    private static class SecretKeyHolder {
+        private ReentrantLock lock=new ReentrantLock();
+        private volatile SecretKeySpec secretKey;
+
+        public ReentrantLock getLock() {
+            return lock;
+        }
+
+
+        public SecretKeySpec getSecretKey() {
+            return secretKey;
+        }
+
+        public SecretKeyHolder setSecretKey(SecretKeySpec secretKey) {
+            this.secretKey = secretKey;
+            return this;
+        }
+    }
 
 
 }

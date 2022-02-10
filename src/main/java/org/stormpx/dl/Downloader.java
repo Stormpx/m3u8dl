@@ -20,14 +20,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadFactory;
 
 public class Downloader {
 
     private URI baseUri;
     private Path workPath;
-    private boolean follow=true;
-    private int maximumSlices=Integer.MAX_VALUE;
+    private boolean reload =false;
+    private boolean merge=false;
+    private int maximumSegment =Integer.MAX_VALUE;
     private DLCiphers ciphers;
 
     public Downloader(URI baseUri, Path workPath) {
@@ -36,12 +36,22 @@ public class Downloader {
         this.workPath = workPath;
     }
 
-    public Downloader setMaximumSlices(int maximumSlices) {
-        this.maximumSlices = maximumSlices;
+    public Downloader setReload(boolean reload) {
+        this.reload = reload;
         return this;
     }
 
-    public void download(String target) throws IOException, InterruptedException, ExecutionException {
+    public Downloader setMerge(boolean merge) {
+        this.merge = merge;
+        return this;
+    }
+
+    public Downloader setMaximumSegment(int maximumSegment) {
+        this.maximumSegment = maximumSegment;
+        return this;
+    }
+
+    public void download(String target) throws IOException, InterruptedException {
         boolean http=false;
         URI uri=null;
         try {
@@ -60,8 +70,6 @@ public class Downloader {
     public void downloadByUri(URI uri) throws IOException, InterruptedException {
 
 
-
-
         URI base=uri.resolve("");
         URI relativeUri = base.relativize(uri);
         String dirName = Strs.removeExt(relativeUri.toString());
@@ -74,7 +82,7 @@ public class Downloader {
                 throw new IOException(String.format("req uri: %s failed",uri));
             }
             if (!reqResult.isM3u8File()){
-                throw new IllegalStateException("not a m3u8 file");
+                throw new IllegalStateException(String.format("'%s' is not a m3u8 file", uri));
             }
             return new M3u8Parser().parse(new InputStreamReader(reqResult.getInputStream()));
         });
@@ -113,7 +121,7 @@ public class Downloader {
         do {
             long now=System.currentTimeMillis();
             URI finalBaseUri = baseUri;
-            readSlices+=context.read(this.maximumSlices,entry -> {
+            readSlices+=context.read(this.maximumSegment, entry -> {
                 try {
                     if (entry instanceof Context.MediaEntry media) {
                         System.out.println();
@@ -175,7 +183,7 @@ public class Downloader {
                 }
             });
 
-            if (context.shouldReload()&&this.follow&&readSlices<maximumSlices){
+            if (context.shouldReload()&&this.reload &&readSlices< maximumSegment){
                 PlayListFile playListFile = context.getPlayListFile();
                 long sleepMillis=((long) (playListFile.getTargetDuration()*1000)-(System.currentTimeMillis()-now));
                 if (sleepMillis>0)
@@ -188,10 +196,11 @@ public class Downloader {
             }
 
 
-        }while (context.shouldReload()&&this.follow&&readSlices<maximumSlices);
+        }while (context.shouldReload()&&this.reload &&readSlices< maximumSegment);
 
         System.out.println();
-        merge(entries,downloadPath);
+        if (this.merge)
+            merge(entries,downloadPath);
 
 
     }

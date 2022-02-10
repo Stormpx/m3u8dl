@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutionException;
 
 public class Http {
     public static HttpClient client;
-    private static String USER_AGENT="pxdl/1.0";
+    private static String USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0";
 
     public static void build(URI proxy, String ua){
         var builder=HttpClient.newBuilder()
