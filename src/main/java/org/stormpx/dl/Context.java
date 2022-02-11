@@ -181,11 +181,21 @@ public class Context {
 
 
         public URI getUri() {
+            //return or resolve?
+            if (this.uri.isAbsolute()){
+                return uri;
+            }
             return baseUri.resolve(this.uri);
         }
 
         public Path getPath(Path path){
-            String name = baseUri.relativize(getUri()).getPath();
+            URI uri = getUri();
+            String name="";
+            if (uri.isAbsolute()){
+                name= uri.resolve("").relativize(uri).getPath();
+            }else {
+                name = baseUri.relativize(uri).getPath();
+            }
             return path.resolve(!isSegment()?name:((Segment)element).getSequence()+"_"+name);
         }
 

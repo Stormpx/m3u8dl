@@ -2,6 +2,7 @@ package org.stormpx.dl.kit;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 
 public class DL {
     public final static ProgressGroup GROUP=new ProgressGroup();
@@ -25,5 +26,13 @@ public class DL {
         System.err.println(s);
     }
 
+
+    public static URI resolve(URI base,String str){
+
+        URI uri = URI.create(str);
+        if (uri.isAbsolute())
+            return uri;
+        return base.resolve(base);
+    }
 
 }

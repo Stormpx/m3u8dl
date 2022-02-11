@@ -18,7 +18,7 @@ public class Http {
 
     public static void build(URI proxy, String ua, Executor executor){
         var builder=HttpClient.newBuilder()
-                .executor(executor)
+//                .executor(executor)
                 .followRedirects(HttpClient.Redirect.NORMAL);
         if (proxy!=null){
             builder.proxy(new DownloadProxySelector(proxy));
@@ -52,7 +52,7 @@ public class Http {
                 builder.setHeader("range",byteRange.start()+"-"+ byteRange.end());
             }
             return Http.client.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofInputStream())
-                    .thenApplyAsync((response)->{
+                    .thenApply((response)->{
                         try {
                             if (response.statusCode()!=200&&response.statusCode()!=206){
                                 response.body().close();

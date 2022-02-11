@@ -75,6 +75,14 @@ public class Main {
 //            System.out.println(Strs.formatByteSize(i));
 //        }
 //
+
+//        System.out.println(URI.create("https://hdtv.prod2.ioio.tv/broker/manifests/e529407a-cb61-45ce-a9ad-94f0ad5e0ad9/270/535680.m3u8")
+//                .resolve(URI.create("https://hdtv.prod2.ioio.tv/sources/65d90a85-feec-418e-9076-68a0c82a7312/hls/90f95aa50ddbff24eec3164ef984cd9b_480x270p-0.4Mbps-400000_00032.ts?bw=400000&c_guid=e529407a-cb61-45ce-a9ad-94f0ad5e0ad9&c_name=Factory&h=270&s_dur=6000&s_pos=186000&s_time=1644599857796&v_dur=193777&v_guid=65d90a85-feec-418e-9076-68a0c82a7312&v_name=Daymaker%20LED%20Lighting&v_type=source"))
+//                );
+
+//        System.out.println(URI.create("https://hdtv.prod2.ioio.tv/sources/65d90a85-feec-418e-9076-68a0c82a7312/hls/90f95aa50ddbff24eec3164ef984cd9b_480x270p-0.4Mbps-400000_00032.ts?bw=400000&c_guid=e529407a-cb61-45ce-a9ad-94f0ad5e0ad9&c_name=Factory&h=270&s_dur=6000&s_pos=186000&s_time=1644599857796&v_dur=193777&v_guid=65d90a85-feec-418e-9076-68a0c82a7312&v_name=Daymaker%20LED%20Lighting&v_type=source").resolve("")
+//                .relativize(URI.create("https://hdtv.prod2.ioio.tv/sources/65d90a85-feec-418e-9076-68a0c82a7312/hls/90f95aa50ddbff24eec3164ef984cd9b_480x270p-0.4Mbps-400000_00032.ts?bw=400000&c_guid=e529407a-cb61-45ce-a9ad-94f0ad5e0ad9&c_name=Factory&h=270&s_dur=6000&s_pos=186000&s_time=1644599857796&v_dur=193777&v_guid=65d90a85-feec-418e-9076-68a0c82a7312&v_name=Daymaker%20LED%20Lighting&v_type=source")).getPath());
+//
 //        System.exit(0);
 
 //        String s="https://europe.olemovienews.com/hlstimeofffmp4/20210226/fICqcpqr/mp4/fICqcpqr.mp4/index-v1-a1.m3u8";

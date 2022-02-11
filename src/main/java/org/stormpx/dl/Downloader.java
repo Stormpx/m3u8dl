@@ -7,6 +7,7 @@ import org.stormpx.dl.m3u8.M3u8Parser;
 import org.stormpx.dl.m3u8.PlayListFile;
 import org.stormpx.dl.m3u8.play.Segment;
 
+import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
@@ -110,8 +111,8 @@ public class Downloader {
     private void download(URI baseUri, String dirName, PlayFileProvider playFileProvider) throws Throwable {
         if (this.baseUri!=null)
             baseUri=this.baseUri;
-        if (dirName.length()>255)
-            dirName=dirName.substring(0,255);
+        if (dirName.length()>128)
+            dirName=dirName.substring(0,128);
         Context context = new Context(baseUri, dirName,null, playFileProvider.getFile());
 
         Path downloadPath = context.getPath(workPath);
@@ -249,7 +250,7 @@ public class Downloader {
 
         public CompletableFuture<Void> start(int num)  {
             return Http.requestAsync(media.getUri(), media.getByteRange())
-                    .thenComposeAsync(reqResult -> {
+                    .thenCompose(reqResult -> {
                             if (!reqResult.isSuccess()) {
                                 return CompletableFuture.failedFuture(new RuntimeException("request ts failed..."));
                             }
@@ -268,14 +269,16 @@ public class Downloader {
                             if (encryptInfo !=null){
                                 if (encryptInfo.getMethod() != EncryptMethod.NONE){
                                     return ciphers.getCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo)
-                                            .thenComposeAsync(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile));
+                                            .thenCompose(cipher ->{
+                                                return write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile);
+                                            });
                                 }
                             }
 
                             return write2FileFuture(inputStream,targetFile);
 
                     })
-                    .exceptionallyComposeAsync(t->{
+                    .exceptionallyCompose(t->{
                         if (num<0){
                             progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
                             return start(num+1);
@@ -292,7 +295,7 @@ public class Downloader {
 //                }
 //                if (reqResult.isM3u8File()) {
 //                    progressBar.failed(".m3u8 file detected. pass... ");
-//                    return;
+//                    return null;
 //                }
 //                progressBar.setMessage(null);
 //                Integer contentLength = reqResult.getContentLength();
@@ -309,7 +312,7 @@ public class Downloader {
 //                    }
 //                }
 //
-//                writeToFile(inputStream,targetFile);
+//                write2File(inputStream,targetFile);
 //
 //
 //            } catch (IOException e) {
@@ -322,6 +325,7 @@ public class Downloader {
 //                }
 //
 //            }
+//            return CompletableFuture.completedFuture(null);
         }
 
         private CompletableFuture<Void> write2FileFuture(InputStream inputStream, File targetFile){
@@ -329,6 +333,7 @@ public class Downloader {
                 write2File(inputStream,targetFile);
                 return CompletableFuture.completedFuture(null);
             } catch (IOException e) {
+                e.printStackTrace();
                 return CompletableFuture.failedFuture(e);
             }
         }
@@ -344,10 +349,15 @@ public class Downloader {
                     out.flush();
                     progressBar.stepBy(dataRead);
                 }
+
                 if (!progressBar.isDone()){
-                    if (progressBar.getTotal()- progressBar.getCurrent()<16)
+                    if (progressBar.getTotal()- progressBar.getCurrent()<=16)
                         progressBar.complete();
                 }
+//                if (!progressBar.isDone()){
+//                    System.out.println(progressBar.getTotal()-progressBar.getCurrent());
+//                }
+//                progressBar.complete();
             }
         }
 
