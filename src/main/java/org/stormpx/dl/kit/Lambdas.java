@@ -1,5 +1,6 @@
 package org.stormpx.dl.kit;
 
+import java.io.IOException;
 import java.text.ParseException;
 import java.util.function.*;
 

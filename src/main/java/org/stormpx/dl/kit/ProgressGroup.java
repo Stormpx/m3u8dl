@@ -9,9 +9,11 @@ public class ProgressGroup {
 
     private List<ProgressBar> progressBars;
 
-    private Progress latest;
+    private Progress prev;
 
     private String residue="";
+
+    private long byteps;
 
     private long timestamp;
 
@@ -68,13 +70,25 @@ public class ProgressGroup {
     }
 
     public void report(){
+        long now = System.currentTimeMillis();
         if (this.timestamp==0){
-            this.timestamp=System.currentTimeMillis();
+            this.timestamp= now;
         }
         Progress progress = new Progress(progressBars);
+        if (this.prev==null){
+            this.byteps=progress.current;
+        }
+        if ((now -this.timestamp)/1000>=1){
+            if (this.prev!=null){
+                this.byteps=progress.current-this.prev.current;
+            }
+            this.prev=progress;
+            this.timestamp= now;
+
+        }
         System.out.printf("\r%s"," ".repeat(residue.length()));
-        this.residue=String.format("\rdownloading.. %s (%d/%d) %s/%s %s",
-                progress.progressingMessage!=null?progress.getProgressingMessage():"",progress.getDoneCount(),progressBars.size(),progress.getCurrent(), progress.getTotal(),progress.getBytePerSecond());
+        this.residue=String.format("\rdownloading.. %s (%d/%d) %s/%s %s/s",
+                progress.progressingMessage!=null?progress.getProgressingMessage():"",progress.getDoneCount(),progressBars.size(),progress.getCurrent(), progress.getTotal(),Strs.formatByteSize(byteps));
         System.out.print(residue);
     }
 
@@ -119,11 +133,6 @@ public class ProgressGroup {
             return doneCount;
         }
 
-        public String getBytePerSecond() {
-            long v=(System.currentTimeMillis()-timestamp)/1000;
-            v=v==0?1:v;
-            return Strs.formatByteSize(this.current/v)+"/s";
-        }
 
         public String getCurrent() {
             return Strs.formatByteSize(current);

@@ -8,6 +8,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 
@@ -17,6 +18,7 @@ public class Http {
 
     public static void build(URI proxy, String ua, Executor executor){
         var builder=HttpClient.newBuilder()
+                .executor(executor)
                 .followRedirects(HttpClient.Redirect.NORMAL);
         if (proxy!=null){
             builder.proxy(new DownloadProxySelector(proxy));
@@ -31,41 +33,50 @@ public class Http {
 
     public static ReqResult request(URI uri, ByteRange byteRange) throws IOException {
         try {
+            return requestAsync(uri,byteRange).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e.getMessage(),e);
+        }
+
+    }
+
+    public static CompletableFuture<ReqResult> requestAsync(URI uri, ByteRange byteRange) {
+
+
             var builder=HttpRequest.newBuilder()
                     .version(HttpClient.Version.HTTP_1_1)
                     .timeout(Duration.ofSeconds(5))
-                            .uri(uri).GET()
-                            .setHeader("user-agent",USER_AGENT);
+                    .uri(uri).GET()
+                    .setHeader("user-agent",USER_AGENT);
             if (byteRange!=null){
                 builder.setHeader("range",byteRange.start()+"-"+ byteRange.end());
             }
-            var response=Http.client.send(builder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
+            return Http.client.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofInputStream())
+                    .thenApplyAsync((response)->{
+                        try {
+                            if (response.statusCode()!=200&&response.statusCode()!=206){
+                                response.body().close();
+                                return new ReqResult(false);
+                            }
+                            ReqResult reqResult = new ReqResult(true);
+                            reqResult.setTargetUri(response.uri());
+                            reqResult.setM3u8File(
+                                    uri.getPath().endsWith(".m3u8")
+                                            ||uri.getPath().endsWith(".m3u")
+                                            ||response.headers().allValues("content-type").stream()
+                                            .anyMatch(str->
+                                                    Objects.equals(str,"application/vnd.apple.mpegurl")||Objects.equals(str,"audio/mpegurl")||Objects.equals(str,"application/x-mpegurl"))
+                            );
 
+                            reqResult.setContentLength(response.headers().firstValue("content-length").map(Integer::valueOf).orElse(-1));
+                            reqResult.setInputStream(response.body());
 
-            if (response.statusCode()!=200&&response.statusCode()!=206){
-                response.body().close();
-                return new ReqResult(false);
-            }
-            ReqResult reqResult = new ReqResult(true);
-            reqResult.setTargetUri(response.uri());
-            reqResult.setM3u8File(
-                            uri.getPath().endsWith(".m3u8")
-                            ||uri.getPath().endsWith(".m3u")
-                            ||response.headers().allValues("content-type").stream()
-                                .anyMatch(str->
-                                    Objects.equals(str,"application/vnd.apple.mpegurl")||Objects.equals(str,"audio/mpegurl")||Objects.equals(str,"application/x-mpegurl"))
-            );
+                            return reqResult;
+                        } catch (IOException e) {
+                            throw new RuntimeException(e.getMessage(),e);
+                        }
+                    });
 
-            reqResult.setContentLength(response.headers().firstValue("content-length").map(Integer::valueOf).orElse(-1));
-            reqResult.setInputStream(response.body());
-
-            return reqResult;
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (ConnectException e){
-            throw new ConnectException("connect to remote failed");
-        }
     }
 
 

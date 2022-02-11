@@ -7,7 +7,6 @@ import org.stormpx.dl.m3u8.M3u8Parser;
 import org.stormpx.dl.m3u8.PlayListFile;
 import org.stormpx.dl.m3u8.play.Segment;
 
-import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
@@ -147,7 +146,7 @@ public class Downloader {
                         DL.GROUP.report();
                         MediaDownload mediaDownload = new MediaDownload(finalBaseUri, filePath, media, progressBar);
 
-                        var future=CompletableFuture.runAsync(Lambdas.rethrowRunnable(()->mediaDownload.start(0)),executor);
+                        var future=mediaDownload.start(0);
 
                         futures.add(future);
                         entries.add(media);
@@ -248,55 +247,107 @@ public class Downloader {
             this.progressBar = progressBar;
         }
 
-        public void start(int num) throws IOException {
+        public CompletableFuture<Void> start(int num)  {
+            return Http.requestAsync(media.getUri(), media.getByteRange())
+                    .thenComposeAsync(reqResult -> {
+                            if (!reqResult.isSuccess()) {
+                                return CompletableFuture.failedFuture(new RuntimeException("request ts failed..."));
+                            }
+                            if (reqResult.isM3u8File()) {
+                                progressBar.failed(".m3u8 file detected. pass... ");
+                                return CompletableFuture.completedFuture(null);
+                            }
+                            progressBar.setMessage(null);
+                            Integer contentLength = reqResult.getContentLength();
+                            InputStream inputStream = reqResult.getInputStream();
+                            File targetFile = filePath.toFile();
+
+                            progressBar.setTotal(contentLength);
+
+                            EncryptInfo encryptInfo = media.getEncryptInfo();
+                            if (encryptInfo !=null){
+                                if (encryptInfo.getMethod() != EncryptMethod.NONE){
+                                    return ciphers.getCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo)
+                                            .thenComposeAsync(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile));
+                                }
+                            }
+
+                            return write2FileFuture(inputStream,targetFile);
+
+                    })
+                    .exceptionallyComposeAsync(t->{
+                        if (num<0){
+                            progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
+                            return start(num+1);
+                        }else{
+                            progressBar.failed("download failed...");
+                            return CompletableFuture.failedFuture(t);
+                        }
+                    });
+
+//            try {
+//                ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());
+//                if (!reqResult.isSuccess()) {
+//                    throw new RuntimeException("request ts failed...");
+//                }
+//                if (reqResult.isM3u8File()) {
+//                    progressBar.failed(".m3u8 file detected. pass... ");
+//                    return;
+//                }
+//                progressBar.setMessage(null);
+//                Integer contentLength = reqResult.getContentLength();
+//                InputStream inputStream = reqResult.getInputStream();
+//                File targetFile = filePath.toFile();
+//
+//                progressBar.setTotal(contentLength);
+//
+//                EncryptInfo encryptInfo = media.getEncryptInfo();
+//                if (encryptInfo !=null){
+//                    if (encryptInfo.getMethod() != EncryptMethod.NONE){
+//                        Cipher cipher = ciphers.getCipher(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo);
+//                        inputStream=new CipherInputStream(inputStream,cipher);
+//                    }
+//                }
+//
+//                writeToFile(inputStream,targetFile);
+//
+//
+//            } catch (IOException e) {
+//                if (num<0){
+//                    progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
+//                    start(num+1);
+//                }else{
+//                    progressBar.failed("download failed...");
+//                    throw new RuntimeException(e.getMessage(),e);
+//                }
+//
+//            }
+        }
+
+        private CompletableFuture<Void> write2FileFuture(InputStream inputStream, File targetFile){
             try {
-                ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());
-                if (!reqResult.isSuccess()) {
-                    throw new RuntimeException("request ts failed...");
-                }
-                if (reqResult.isM3u8File()) {
-                    progressBar.failed(".m3u8 file detected. pass... ");
-                    return;
-                }
-                progressBar.setMessage(null);
-                Integer contentLength = reqResult.getContentLength();
-                InputStream inputStream = reqResult.getInputStream();
-                File targetFile = filePath.toFile();
-
-                EncryptInfo encryptInfo = media.getEncryptInfo();
-                if (encryptInfo !=null){
-                    if (encryptInfo.getMethod() != EncryptMethod.NONE){
-                        Cipher cipher = ciphers.getCipher(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo);
-                        inputStream=new CipherInputStream(inputStream,cipher);
-                    }
-                }
-
-                progressBar.setTotal(contentLength);
-
-                byte[] buffer = DLThreadContext.current().getBuffer();
-                try (InputStream in=inputStream;
-                     FileOutputStream out = new FileOutputStream(targetFile, false)){
-
-                    int dataRead=-1;
-                    while ((dataRead= in.read(buffer))!=-1){
-                        out.write(buffer,0,dataRead);
-                        out.flush();
-                        progressBar.stepBy(dataRead);
-                    }
-                    if (!progressBar.isDone()){
-                        if (progressBar.getTotal()- progressBar.getCurrent()<16)
-                            progressBar.complete();
-                    }
-                }
+                write2File(inputStream,targetFile);
+                return CompletableFuture.completedFuture(null);
             } catch (IOException e) {
-                if (num<0){
-                    progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
-                    start(num+1);
-                }else{
-                    progressBar.failed("download failed...");
-                    throw new RuntimeException(e.getMessage(),e);
-                }
+                return CompletableFuture.failedFuture(e);
+            }
+        }
 
+        private void write2File(InputStream inputStream, File targetFile) throws IOException {
+            byte[] buffer = DLThreadContext.current().getBuffer();
+            try (InputStream in=inputStream;
+                 FileOutputStream out = new FileOutputStream(targetFile, false)){
+
+                int dataRead;
+                while ((dataRead= in.read(buffer))!=-1){
+                    out.write(buffer,0,dataRead);
+                    out.flush();
+                    progressBar.stepBy(dataRead);
+                }
+                if (!progressBar.isDone()){
+                    if (progressBar.getTotal()- progressBar.getCurrent()<16)
+                        progressBar.complete();
+                }
             }
         }
 

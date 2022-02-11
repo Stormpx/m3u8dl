@@ -78,7 +78,6 @@ public class Main {
 //        System.exit(0);
 
 //        String s="https://europe.olemovienews.com/hlstimeofffmp4/20210226/fICqcpqr/mp4/fICqcpqr.mp4/index-v1-a1.m3u8";
-//        String s="https://1258712167.vod2.myqcloud.com/fb8e6c92vodtranscq1258712167/e223ace85285890805202470684/drm/voddrm.token.dWluPTE5MTUyMDQ2MDc7c2tleT1AcHRCRUFXc2lwO3Bza2V5PXRlWnFIVWpxcXJ1WFBibE9DRXdXNC1FUDIyVHllaDMzQW5mMmFTVUxkNElfO3Bsc2tleT0wMDA0MDAwMDlhNGM0NmNhYWZkZDI0MGEwNjdlMzU4NWEzMGIyYjQyYWNhMGM3ZmRlMTA2NTdmY2QyN2M4ZDc0NmJkZjZmN2ZkYjVkZWQxMjY4ZmNlNjBlO2V4dD07dWlkX3R5cGU9MDt1aWRfb3JpZ2luX3VpZF90eXBlPTA7dWlkX29yaWdpbl9hdXRoX3R5cGU9MDtjaWQ9Mjk3NDYxO3Rlcm1faWQ9MTAwMzUyNTQ2O3ZvZF90eXBlPTA=.v.f30739.m3u8?exper=0&sign=25db63d3dd16c7ae7f17b70aa788f30f&t=620E0940&us=4899204661372339825";
 //        new Downloader(null,Path.of("Z:\\m3u8\\download"))
 //                .setMaximumSlices(3)
 //                .download(s);

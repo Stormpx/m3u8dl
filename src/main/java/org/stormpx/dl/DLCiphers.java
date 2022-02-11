@@ -15,7 +15,10 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class DLCiphers {
@@ -34,37 +37,52 @@ public class DLCiphers {
         return cipher;
     }
 
-    public Cipher getCipher(URI baseUri,long sequence,EncryptInfo encryptInfo) throws IOException {
+    private byte[] sequence2Iv(long sequence){
+        byte[] iv=new byte[16];
+        ByteBuffer.wrap(iv)
+                .putLong(8,sequence);
+        return iv;
+    }
+
+    public Cipher getCipher(URI baseUri,long sequence,EncryptInfo encryptInfo)  {
+        try {
+            return getCipherAsync(baseUri, sequence, encryptInfo).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e.getMessage(),e);
+        }
+    }
+
+    public CompletableFuture<Cipher> getCipherAsync(URI baseUri, long sequence, EncryptInfo encryptInfo)  {
         SecretKeyHolder keyHolder = keyMap.computeIfAbsent(encryptInfo, k -> new SecretKeyHolder());
         SecretKeySpec key = keyHolder.getSecretKey();
         if (key==null){
             lock.lock();
-            try {
-                key= keyHolder.getSecretKey();
-                if (key==null){
-                    ReqResult reqResult = Http.request(baseUri.resolve(encryptInfo.getUri()), null);
-                    if (!reqResult.isSuccess()){
-                        throw new RuntimeException("req decrypt key failed");
-                    }
-                    byte[] bytes = reqResult.getInputStream().readAllBytes();
-                    reqResult.getInputStream().close();
-
-                    key=new SecretKeySpec(bytes,"AES");
-                    keyHolder.setSecretKey(key);
-                }
-            } finally {
+            key= keyHolder.getSecretKey();
+            if (key!=null) {
                 lock.unlock();
+            }else {
+                Http.requestAsync(baseUri.resolve(encryptInfo.getUri()), null)
+                        .thenApplyAsync(reqResult -> {
+                            try {
+                                if (!reqResult.isSuccess()){
+                                    throw new RuntimeException("req decrypt key failed");
+                                }
+                                byte[] bytes = reqResult.getInputStream().readAllBytes();
+                                reqResult.getInputStream().close();
+
+                                SecretKeySpec newKey=new SecretKeySpec(bytes,"AES");
+                                keyHolder.setSecretKey(newKey);
+                                return CompletableFuture.completedFuture(createCipher(newKey,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
+                            } catch (IOException e) {
+                                throw new RuntimeException(e.getMessage(),e);
+                            }
+                        })
+                        .whenCompleteAsync((v,t)->lock.unlock());
+
             }
-
         }
-        byte[] iv=encryptInfo.getIv();
-        if (iv==null){
-            iv=new byte[16];
-            ByteBuffer.wrap(iv)
-                    .putLong(8,sequence);
+        return CompletableFuture.completedFuture(createCipher(key,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
 
-        }
-        return createCipher(key,new IvParameterSpec(iv));
     }
 
     private static class SecretKeyHolder {
