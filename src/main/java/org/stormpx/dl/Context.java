@@ -65,12 +65,12 @@ public class Context {
             }
             maxSequence = this.playListFile.getMediaSequence() + this.playListFile.getSegmentSize()-1;
         }
-        boolean change=false;
+        boolean append=false;
         for (PlayListElement element : file.getElements()) {
             if (element instanceof Segment seq){
                 if (seq.getSequence()>maxSequence){
                     this.playList.add(seq);
-                    change=true;
+                    append=true;
                 }
             }else{
                 this.playList.add(element);
@@ -78,7 +78,7 @@ public class Context {
         }
 
         this.playListFile=file;
-        return change;
+        return append;
     }
 
     public Path getPath(Path workPath){
@@ -99,6 +99,8 @@ public class Context {
 
 
     public int read(int maxSlices,Consumer<Entry> segmentHandler){
+        if (maxSlices<=0)
+            return 0;
         int slices=0;
         EncryptInfo encryptInfo =null;
         MediaEntry prev=null;

@@ -3,6 +3,8 @@ package org.stormpx.dl;
 
 import org.stormpx.dl.kit.DL;
 import org.stormpx.dl.kit.Http;
+import org.stormpx.dl.kit.Lambdas;
+import org.stormpx.dl.kit.Strs;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -15,14 +17,17 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
     private static boolean SYS_IN=true;
 
     public static Integer getInt(String option,String[] args,int index){
         if (index>=args.length){
-            System.err.println(option+": requires argument");
+            DL.perr(option+": requires argument");
             System.exit(128);
         }
         var str=args[index];
@@ -30,7 +35,7 @@ public class Main {
         try {
             i = Integer.parseInt(str);
             if (i<=0){
-                System.err.println(option+": expected argument > 0");
+                DL.perr(option+": expected argument > 0");
             }
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(option+": invalid number of "+str);
@@ -40,7 +45,7 @@ public class Main {
 
     public static String getString(String option,String[] args,int index){
         if (index>=args.length){
-            System.err.println(option+": requires argument");
+            DL.perr(option + ": requires argument");
             System.exit(128);
         }
         return args[index];
@@ -50,7 +55,8 @@ public class Main {
         String helps= """
                 Usage: m3u8dl [options] url
                     -b --baseUrl <baseUrl>
-                    -w --workDir <directory> set directory to save segment
+                    -d --workDir <directory> set directory to save segment
+                    -t --thread <number> set download threads
                     -m --maxSegment <number> set maximum number of segment to download
                     --proxy <address> set proxy. eg http://127.0.0.1:8889
                     -r --reload set to enable live streaming download. default: false
@@ -64,13 +70,13 @@ public class Main {
     public static void main(String[] args) throws IOException, InterruptedException, ExecutionException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 //        DL.DEBUG=true;
 
-//        System.out.println(URI.create("http://kia.stormx.link/fuck").resolve(""));
-//        System.out.println(URI.create("http://kia.stormx.link/0ac338785b5e4e36a91c1cff6c24f6d2/video/").resolve("shit"));
-
+//        int[] arr={1024*1024*1025,1025*1024,1025,1};
+//        for (int i : arr) {
+//            System.out.println(Strs.formatByteSize(i));
+//        }
+//
 //        System.exit(0);
 
-//        Http.build(null,null);
-        String s="http://kia.stormx.link/0ac338785b5e4e36a91c1cff6c24f6d2/video/7920a5df00b64c14bc30382b6196bbef-7d33de1855564bd1b66b777a7dd11efb-video-ld.m3u8";
 //        String s="https://europe.olemovienews.com/hlstimeofffmp4/20210226/fICqcpqr/mp4/fICqcpqr.mp4/index-v1-a1.m3u8";
 //        String s="https://1258712167.vod2.myqcloud.com/fb8e6c92vodtranscq1258712167/e223ace85285890805202470684/drm/voddrm.token.dWluPTE5MTUyMDQ2MDc7c2tleT1AcHRCRUFXc2lwO3Bza2V5PXRlWnFIVWpxcXJ1WFBibE9DRXdXNC1FUDIyVHllaDMzQW5mMmFTVUxkNElfO3Bsc2tleT0wMDA0MDAwMDlhNGM0NmNhYWZkZDI0MGEwNjdlMzU4NWEzMGIyYjQyYWNhMGM3ZmRlMTA2NTdmY2QyN2M4ZDc0NmJkZjZmN2ZkYjVkZWQxMjY4ZmNlNjBlO2V4dD07dWlkX3R5cGU9MDt1aWRfb3JpZ2luX3VpZF90eXBlPTA7dWlkX29yaWdpbl9hdXRoX3R5cGU9MDtjaWQ9Mjk3NDYxO3Rlcm1faWQ9MTAwMzUyNTQ2O3ZvZF90eXBlPTA=.v.f30739.m3u8?exper=0&sign=25db63d3dd16c7ae7f17b70aa788f30f&t=620E0940&us=4899204661372339825";
 //        new Downloader(null,Path.of("Z:\\m3u8\\download"))
@@ -124,7 +130,7 @@ public class Main {
                     case "--userAgent":
                         userAgent= getString(arg,args, ++readIdx);
                         continue;
-                    case "-w":
+                    case "-d":
                     case "--workDir":
                         try {
                             String path = getString(arg,args, ++readIdx);
@@ -145,15 +151,18 @@ public class Main {
                         continue;
                     default:
                         if (arg.startsWith("-"))
-                            System.err.println("unrecognized option '"+arg+"'");
+                            DL.perr("unrecognized option '"+arg+"'");
                         else if (readIdx== args.length-1)
                             SYS_IN=false;
 
                 }
             }
 
-            Http.build(proxyAddr,userAgent);
-            Downloader downloader = new Downloader(baseUri,workDir)
+            System.out.println("threads: "+thread);
+            ExecutorService threadPool = Executors.newFixedThreadPool(thread);
+
+            Http.build(proxyAddr,userAgent,threadPool);
+            Downloader downloader = new Downloader(baseUri,workDir,threadPool)
                     .setReload(reload)
                     .setMerge(merge)
                     .setMaximumSegment(maxSegment)
@@ -167,14 +176,16 @@ public class Main {
                     String input = scan.nextLine();
                     //                System.out.println(url);
                     downloader.download(input);
-
+                    DL.poutln("download "+input+" done.");
                 }
             }
+            //done
+            threadPool.shutdown();
         } catch (Throwable e){
             if (DL.DEBUG) {
                 e.printStackTrace();
             }else {
-                System.err.println(e.getMessage());
+                DL.perr(e.getMessage());
             }
             System.exit(1);
         }

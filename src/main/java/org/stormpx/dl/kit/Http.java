@@ -9,12 +9,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 
 public class Http {
     public static HttpClient client;
     private static String USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0";
 
-    public static void build(URI proxy, String ua){
+    public static void build(URI proxy, String ua, Executor executor){
         var builder=HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL);
         if (proxy!=null){
@@ -41,6 +42,7 @@ public class Http {
             var response=Http.client.send(builder.build(),
                     HttpResponse.BodyHandlers.ofInputStream());
 
+
             if (response.statusCode()!=200&&response.statusCode()!=206){
                 response.body().close();
                 return new ReqResult(false);
@@ -61,6 +63,8 @@ public class Http {
             return reqResult;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } catch (ConnectException e){
+            throw new ConnectException("connect to remote failed");
         }
     }
 

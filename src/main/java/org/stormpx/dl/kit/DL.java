@@ -9,8 +9,21 @@ public class DL {
     public static boolean DEBUG=false;
 
 
-    public static void transferTo(byte[] buffer, InputStream inputStream, OutputStream outputStream){
 
+    public static void poutf(String format, Object ... args){
+        System.out.printf(format, args);
     }
+
+    public static void pout(String s){
+        System.out.print(s);
+    }
+    public static void poutln(String s){
+        System.out.println(s);
+    }
+
+    public static void perr(String s){
+        System.err.println(s);
+    }
+
 
 }
