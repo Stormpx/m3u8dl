@@ -269,9 +269,7 @@ public class Downloader {
                             if (encryptInfo !=null){
                                 if (encryptInfo.getMethod() != EncryptMethod.NONE){
                                     return ciphers.getCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo)
-                                            .thenCompose(cipher ->{
-                                                return write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile);
-                                            });
+                                            .thenCompose(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile));
                                 }
                             }
 

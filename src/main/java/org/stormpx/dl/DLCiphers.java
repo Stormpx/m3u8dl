@@ -15,10 +15,8 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class DLCiphers {
@@ -52,72 +50,58 @@ public class DLCiphers {
     }
 
     public CompletableFuture<Cipher> getCipherAsync(URI baseUri, long sequence, EncryptInfo encryptInfo)  {
-        return Http.requestAsync(baseUri.resolve(encryptInfo.getUri()), null)
-                .thenApply(reqResult -> {
-                    try {
-                        if (!reqResult.isSuccess()){
-                            throw new RuntimeException("req decrypt key failed");
-                        }
-                        byte[] bytes = reqResult.getInputStream().readAllBytes();
-                        reqResult.getInputStream().close();
-                        //                                System.out.println("?????");
 
-                        SecretKeySpec newKey=new SecretKeySpec(bytes,"AES");
-                        return createCipher(newKey,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence)));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e.getMessage(),e);
+        try {
+            SecretKeyHolder keyHolder = keyMap.computeIfAbsent(encryptInfo, k -> new SecretKeyHolder());
+            CompletableFuture<SecretKeySpec> future = keyHolder.keySpecFuture;
+
+            if (future==null){
+                Semaphore semaphore = keyHolder.semaphore;
+                semaphore.acquire();
+                try {
+                    future= keyHolder.keySpecFuture;
+                    if (future==null||future.isCompletedExceptionally()||future.isCancelled()) {
+                        future = Http.requestAsync(baseUri.resolve(encryptInfo.getUri()), null)
+                                .thenApply(reqResult -> {
+                                    try {
+                                        if (!reqResult.isSuccess()) {
+                                            throw new RuntimeException("req decrypt key failed");
+                                        }
+                                        byte[] bytes = reqResult.getInputStream().readAllBytes();
+                                        reqResult.getInputStream().close();
+
+                                        return new SecretKeySpec(bytes, "AES");
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e.getMessage(), e);
+                                    }
+                                });
+                        keyHolder.keySpecFuture=future;
                     }
-                });
-
-//        SecretKeyHolder keyHolder = keyMap.computeIfAbsent(encryptInfo, k -> new SecretKeyHolder());
-//        SecretKeySpec key = keyHolder.getSecretKey();
-//        ReentrantLock lock = keyHolder.getLock();
-//        if (key==null){
-//            lock.lock();
-//            key= keyHolder.getSecretKey();
-//            if (key!=null) {
-//                lock.unlock();
-//            }else {
-//                return Http.requestAsync(baseUri.resolve(encryptInfo.getUri()), null)
-//                        .thenApply(reqResult -> {
-//                            try {
-//                                if (!reqResult.isSuccess()){
-//                                    throw new RuntimeException("req decrypt key failed");
-//                                }
-//                                byte[] bytes = reqResult.getInputStream().readAllBytes();
-//                                reqResult.getInputStream().close();
-////                                System.out.println("?????");
-//
-//                                SecretKeySpec newKey=new SecretKeySpec(bytes,"AES");
-//                                keyHolder.setSecretKey(newKey);
-//                                return createCipher(newKey,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence)));
-//                            } catch (IOException e) {
-//                                throw new RuntimeException(e.getMessage(),e);
-//                            }
-//                        })
-//                        .whenComplete((v,t)->lock.unlock());
-//
-//            }
-//        }
-//        return CompletableFuture.completedFuture(createCipher(key,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
+                }finally {
+                    semaphore.release();
+                }
+            }
+            return future.thenApplyAsync(key-> createCipher(key,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e.getMessage(),e);
+        }
 
     }
 
     private static class SecretKeyHolder {
-        private ReentrantLock lock=new ReentrantLock();
-        private volatile SecretKeySpec secretKey;
+        private Semaphore semaphore=new Semaphore(1);
+        private volatile CompletableFuture<SecretKeySpec> keySpecFuture;
 
-        public ReentrantLock getLock() {
-            return lock;
+        public Semaphore getSemaphore() {
+            return semaphore;
         }
 
-
-        public SecretKeySpec getSecretKey() {
-            return secretKey;
+        public CompletableFuture<SecretKeySpec> keyFuture() {
+            return keySpecFuture;
         }
 
-        public SecretKeyHolder setSecretKey(SecretKeySpec secretKey) {
-            this.secretKey = secretKey;
+        public SecretKeyHolder setKeySpecFuture(CompletableFuture<SecretKeySpec> keySpecFuture) {
+            this.keySpecFuture = keySpecFuture;
             return this;
         }
     }
