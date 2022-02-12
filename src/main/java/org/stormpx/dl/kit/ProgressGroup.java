@@ -69,7 +69,7 @@ public class ProgressGroup {
 
     }
 
-    public void report(){
+    public void report(String overview){
         long now = System.currentTimeMillis();
         if (this.timestamp==0){
             this.timestamp= now;
@@ -86,16 +86,19 @@ public class ProgressGroup {
             this.timestamp= now;
 
         }
+
         System.out.printf("\r%s"," ".repeat(residue.length()));
-        this.residue=String.format("\rdownloading.. %s (%d/%d) %s/%s %s/s",
-                progress.progressingMessage!=null?progress.getProgressingMessage():"",progress.getDoneCount(),progressBars.size(),progress.getCurrent(), progress.getTotal(),Strs.formatByteSize(byteps));
+        this.residue=String.format("\r%s.. %s (%d/%d) %s/%s %s/s",
+                overview==null?"downloading":overview,
+                progress.progressingMessage!=null?progress.getProgressingMessage():"",
+                progress.getDoneCount(),progressBars.size(),progress.getCurrent(), progress.getTotal(),Strs.formatByteSize(byteps));
         System.out.print(residue);
     }
 
     public void reportAwait() throws InterruptedException {
         boolean done=false;
         while (!done){
-            report();
+            report(null);
             int size = progressBars.size();
             done=true;
             for (int i = 0; i < size; i++) {
@@ -116,7 +119,7 @@ public class ProgressGroup {
         public Progress(List<ProgressBar> progressBars) {
             for (ProgressBar progressBar : progressBars) {
                 if (this.progressingMessage ==null&&!progressBar.isDone())
-                    this.progressingMessage =progressBar.getTaskName();
+                    this.progressingMessage =progressBar.getTaskName()+": "+(progressBar.getMessage()==null?"":progressBar.getMessage());
                 if (progressBar.isDone()){
                     doneCount++;
                 }

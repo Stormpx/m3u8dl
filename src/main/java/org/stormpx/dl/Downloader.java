@@ -26,7 +26,7 @@ public class Downloader {
     private Executor executor;
     private URI baseUri;
     private Path workPath;
-    private int retry=0;
+    private int retry=3;
     private boolean reload =false;
     private boolean merge=false;
     private int maximumSegment =Integer.MAX_VALUE;
@@ -124,6 +124,10 @@ public class Downloader {
         }
 
         DL.poutln("workDir: "+downloadPath);
+        if (context.shouldReload()){
+            DL.poutln("live streaming file detected..");
+        }
+
         int readSlices=0;
         List<Context.Entry> entries=new ArrayList<>();
         List<CompletableFuture<Void>> futures=new ArrayList<>();
@@ -139,12 +143,12 @@ public class Downloader {
 //                        URI uri = media.getUri();
                         Path filePath = media.getPath(downloadPath);
 
-                        ProgressBar progressBar = new ProgressBar( 50, filePath.getFileName() + ": ");
+                        ProgressBar progressBar = new ProgressBar( 50, filePath.getFileName() + "");
                         progressBar.setMessage("request...");
 //                        DL.GROUP.clear();
                         DL.GROUP.addBar(progressBar);
 //                        DL.GROUP.show(false);
-                        DL.GROUP.report();
+                        DL.GROUP.report(null);
                         MediaDownload mediaDownload = new MediaDownload(finalBaseUri, filePath, media, progressBar);
 
                         var future=mediaDownload.start(0);
@@ -180,6 +184,9 @@ public class Downloader {
         tryThrow(futures);
 
         DL.GROUP.reportAwait();
+
+        tryThrow(futures);
+
         System.out.println();
         if (this.merge)
             merge(entries,downloadPath);
@@ -203,7 +210,7 @@ public class Downloader {
 //        DL.GROUP.clear();
 //        DL.GROUP.show(false);
         while (System.currentTimeMillis()<delay){
-            DL.GROUP.report();
+            DL.GROUP.report(null);
             Thread.sleep(200);
         }
 
@@ -277,7 +284,7 @@ public class Downloader {
 
                     })
                     .exceptionallyCompose(t->{
-                        if (num<0){
+                        if (num<retry){
                             progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
                             return start(num+1);
                         }else{
@@ -331,7 +338,6 @@ public class Downloader {
                 write2File(inputStream,targetFile);
                 return CompletableFuture.completedFuture(null);
             } catch (IOException e) {
-                e.printStackTrace();
                 return CompletableFuture.failedFuture(e);
             }
         }

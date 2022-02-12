@@ -28,6 +28,10 @@ public class ProgressBar {
         return taskName;
     }
 
+    public String getMessage() {
+        return message;
+    }
+
     public int getTotal() {
         return total;
     }
