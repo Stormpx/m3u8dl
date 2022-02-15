@@ -103,6 +103,7 @@ public class Context {
             return 0;
         int slices=0;
         EncryptInfo encryptInfo =null;
+        InitInfo initInfo=null;
         MediaEntry prev=null;
         while (!playList.isEmpty()&&slices<maxSlices){
             PlayListElement element = playList.poll();
@@ -112,7 +113,11 @@ public class Context {
             }else if (element instanceof EncryptInfo encrypt){
                 encryptInfo =encrypt;
             }else if (element instanceof InitInfo map){
-                segmentHandler.accept(new MediaEntry(encryptInfo,map));
+                if (!Objects.equals(initInfo,map)){
+                    initInfo=map;
+                    segmentHandler.accept(new MediaEntry(encryptInfo,map));
+                }
+
             }
         }
         return slices;

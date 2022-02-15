@@ -67,9 +67,8 @@ public class Main {
         System.exit(0);
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException, ExecutionException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    public static void main(String[] args){
 //        DL.DEBUG=true;
-
         String userAgent=null;
         URI baseUri=null;
         int thread=Runtime.getRuntime().availableProcessors();

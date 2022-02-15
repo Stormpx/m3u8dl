@@ -35,5 +35,18 @@ public class InitInfo implements PlayListElement {
         this.byteRange = byteRange;
         return this;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        InitInfo initInfo = (InitInfo) o;
+        return Objects.equals(uri, initInfo.uri) && Objects.equals(byteRange, initInfo.byteRange);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(uri, byteRange);
+    }
 }
 
