@@ -1,8 +1,12 @@
 package org.stormpx.dl.kit;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class DL {
     public final static ProgressGroup GROUP=new ProgressGroup();
@@ -33,6 +37,16 @@ public class DL {
         if (uri.isAbsolute())
             return uri;
         return base.resolve(base);
+    }
+
+    public static void createDir(Path path) throws IOException {
+        if (Files.notExists(path)){
+            Files.createDirectories(path);
+        }else{
+            if (!Files.isDirectory(path)){
+                throw new FileAlreadyExistsException(path+" already exists and is not a dir.");
+            }
+        }
     }
 
 }

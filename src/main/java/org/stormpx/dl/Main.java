@@ -145,6 +145,7 @@ public class Main {
             }
 
             System.out.println("threads: "+thread);
+            DL.poutln("workDir: "+workDir);
             ExecutorService threadPool = Executors.newFixedThreadPool(thread);
 
             Http.build(proxyAddr,userAgent,threadPool);

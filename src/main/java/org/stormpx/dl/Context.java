@@ -1,9 +1,8 @@
 package org.stormpx.dl;
 
-import org.stormpx.dl.kit.Strs;
 import org.stormpx.dl.m3u8.EncryptInfo;
 import org.stormpx.dl.m3u8.PlayListElement;
-import org.stormpx.dl.m3u8.PlayListFile;
+import org.stormpx.dl.m3u8.play.MediaList;
 import org.stormpx.dl.kit.ByteRange;
 import org.stormpx.dl.m3u8.PlayListType;
 import org.stormpx.dl.m3u8.play.InitInfo;
@@ -19,19 +18,23 @@ import java.util.function.Consumer;
 
 public class Context {
 
-    private URI uri;
-
     private URI baseUri;
 
     private String dirName;
 
     private Context parent;
 
-    private PlayListFile playListFile;
+    private MediaList playListFile;
 
     private Queue<PlayListElement> playList;
 
-    public Context(URI baseUri, String dirName, Context parent, PlayListFile playListFile) {
+    private EncryptInfo encryptInfo =null;
+
+    private InitInfo initInfo=null;
+
+    private MediaEntry prev=null;
+
+    public Context(URI baseUri, String dirName, Context parent, MediaList playListFile) {
         Objects.requireNonNull(baseUri);
         this.baseUri = baseUri;
         this.dirName = dirName;
@@ -40,24 +43,16 @@ public class Context {
         append(playListFile);
     }
 
-    public Context(URI uri, Context parent, PlayListFile playListFile) {
-        Objects.requireNonNull(uri);
-        this.uri = uri;
-        this.baseUri = uri.resolve("");
-        this.parent = parent;
-        this.playList=new LinkedList<>();
-        append(playListFile);
-    }
 
     public boolean shouldReload(){
-        return !playListFile.isEndTag()&&playListFile.getType()!= PlayListType.VOD;
+        return !playListFile.isEnd()&&playListFile.getType()!= PlayListType.VOD;
     }
 
-    public PlayListFile getPlayListFile() {
+    public MediaList getPlayListFile() {
         return playListFile;
     }
 
-    public boolean append(PlayListFile file){
+    public boolean append(MediaList file){
         long maxSequence =-1;
         if (this.playListFile!=null){
             if (this.playListFile.getMediaSequence()>file.getMediaSequence()){
@@ -81,34 +76,19 @@ public class Context {
         return append;
     }
 
-    public Path getPath(Path workPath){
-        Objects.requireNonNull(workPath);
-        String dirName=this.dirName;
-        if (dirName==null) {
-            if (this.uri!=null) {
-                URI uri = baseUri.relativize(this.uri);
-                dirName = Strs.removeExt(uri.getPath());
-
-            }
-            if (dirName == null || dirName.isBlank()) {
-                dirName = UUID.randomUUID().toString().replaceAll("-", "");
-            }
-        }
-        return workPath.resolve(dirName);
-    }
 
 
-    public int read(int maxSlices,Consumer<Entry> segmentHandler){
+    public int read(int maxSlices,Consumer<MediaEntry> segmentHandler){
         if (maxSlices<=0)
             return 0;
         int slices=0;
-        EncryptInfo encryptInfo =null;
-        InitInfo initInfo=null;
-        MediaEntry prev=null;
+
         while (!playList.isEmpty()&&slices<maxSlices){
             PlayListElement element = playList.poll();
             if (element instanceof Segment seg){
-                segmentHandler.accept(new MediaEntry(encryptInfo,seg,prev));
+                MediaEntry entry = new MediaEntry(encryptInfo, seg, prev);
+                segmentHandler.accept(entry);
+                prev=entry;
                 slices++;
             }else if (element instanceof EncryptInfo encrypt){
                 encryptInfo =encrypt;

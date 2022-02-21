@@ -4,7 +4,6 @@ public enum EncryptMethod {
 
     NONE("NONE"),
     AES_128("AES-128"),
-    SAMPLE_AES("SAMPLE-AES")
     ;
 
     private String value;

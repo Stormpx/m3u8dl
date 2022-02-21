@@ -1,7 +1,7 @@
 package org.stormpx.dl;
 
 import org.stormpx.dl.kit.Http;
-import org.stormpx.dl.kit.ReqResult;
+import org.stormpx.dl.kit.Strs;
 import org.stormpx.dl.m3u8.EncryptInfo;
 
 import javax.crypto.Cipher;
@@ -15,9 +15,8 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class DLCiphers {
 
@@ -41,16 +40,8 @@ public class DLCiphers {
         return iv;
     }
 
-    public Cipher getCipher(URI baseUri,long sequence,EncryptInfo encryptInfo)  {
-        try {
-            return getCipherAsync(baseUri, sequence, encryptInfo).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e.getMessage(),e);
-        }
-    }
 
-    public CompletableFuture<Cipher> getCipherAsync(URI baseUri, long sequence, EncryptInfo encryptInfo)  {
-
+    public CompletableFuture<SecretKeySpec> load(URI baseUri,EncryptInfo encryptInfo){
         try {
             SecretKeyHolder keyHolder = keyMap.computeIfAbsent(encryptInfo, k -> new SecretKeyHolder());
             CompletableFuture<SecretKeySpec> future = keyHolder.keySpecFuture;
@@ -81,10 +72,15 @@ public class DLCiphers {
                     semaphore.release();
                 }
             }
-            return future.thenApplyAsync(key-> createCipher(key,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
+            return future;
         } catch (InterruptedException e) {
             throw new RuntimeException(e.getMessage(),e);
         }
+    }
+
+    public CompletableFuture<Cipher> createCipherAsync(URI baseUri, long sequence, EncryptInfo encryptInfo)  {
+        return load(baseUri,encryptInfo)
+                .thenApply(key-> createCipher(key,new IvParameterSpec(encryptInfo.getIv()!=null?encryptInfo.getIv():sequence2Iv(sequence))));
 
     }
 
@@ -92,18 +88,6 @@ public class DLCiphers {
         private Semaphore semaphore=new Semaphore(1);
         private volatile CompletableFuture<SecretKeySpec> keySpecFuture;
 
-        public Semaphore getSemaphore() {
-            return semaphore;
-        }
-
-        public CompletableFuture<SecretKeySpec> keyFuture() {
-            return keySpecFuture;
-        }
-
-        public SecretKeyHolder setKeySpecFuture(CompletableFuture<SecretKeySpec> keySpecFuture) {
-            this.keySpecFuture = keySpecFuture;
-            return this;
-        }
     }
 
 

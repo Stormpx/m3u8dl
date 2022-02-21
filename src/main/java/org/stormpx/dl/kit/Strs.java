@@ -1,6 +1,16 @@
 package org.stormpx.dl.kit;
 
+import java.util.List;
+
 public class Strs {
+
+    public static boolean isBlank(String str){
+        return str==null||str.isBlank();
+    }
+
+    public static List<String> split(String str,String regex){
+        return isBlank(str)?List.of():List.of(str.split(regex));
+    }
 
     public static String removeExt(String str){
         if(str!=null&&str.contains("."))
