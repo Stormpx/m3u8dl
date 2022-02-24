@@ -11,6 +11,8 @@ public class ProgressGroup {
 
     private Progress prev;
 
+    private String prefix="downloading";
+
     private String residue="";
 
     private long byteps;
@@ -69,7 +71,7 @@ public class ProgressGroup {
 
     }
 
-    public void report(String overview){
+    public void report(){
         long now = System.currentTimeMillis();
         if (this.timestamp==0){
             this.timestamp= now;
@@ -89,7 +91,7 @@ public class ProgressGroup {
 
         System.out.printf("\r%s"," ".repeat(residue.length()));
         this.residue=String.format("\r%s.. %s (%d/%d) %s/%s %s/s",
-                overview==null?"downloading":overview,
+                prefix,
                 progress.progressingMessage!=null?progress.getProgressingMessage():"",
                 progress.getDoneCount(),progressBars.size(),progress.getCurrent(), progress.getTotal(),Strs.formatByteSize(byteps));
         System.out.print(residue);
@@ -98,7 +100,7 @@ public class ProgressGroup {
     public void reportAwait() throws InterruptedException {
         boolean done=false;
         while (!done){
-            report(null);
+            report();
             int size = progressBars.size();
             done=true;
             for (int i = 0; i < size; i++) {

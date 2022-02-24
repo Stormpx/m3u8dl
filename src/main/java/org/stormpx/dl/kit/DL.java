@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class DL {
-    public final static ProgressGroup GROUP=new ProgressGroup();
     public static boolean VIEW=false;
     public static boolean DEBUG=false;
 

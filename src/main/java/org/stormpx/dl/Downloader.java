@@ -127,26 +127,28 @@ public class Downloader {
             //master
             MasterList masterList= (MasterList) playList;
 
-            for (StreamInfo stream : masterList.getStreams()) {
-                if (Strs.isBlank(stream.getUri())){
+            List<StreamInfo> streams = masterList.getStreams();
+            for (int i = 0; i < streams.size(); i++) {
+                StreamInfo stream = streams.get(i);
+                if (Strs.isBlank(stream.getUri())) {
                     continue;
                 }
                 URI uri = URI.create(stream.getUri());
-                if (!uri.isAbsolute()){
-                    uri=baseUri.resolve(uri);
+                if (!uri.isAbsolute()) {
+                    uri = baseUri.resolve(uri);
                 }
-                URI base=uri.resolve("");
+                URI base = uri.resolve("");
                 String dir = Strs.removeExt(base.relativize(uri).getPath());
 
                 URI finalUri = uri;
                 //download stream
-                DL.poutln("try download variant stream : "+uri);
-                download(base,downloadPath,dir,()->{
-                    ReqResult reqResult = Http.request(finalUri,null);
-                    if (!reqResult.isSuccess()){
+                DL.poutln("try download variant stream: " + uri);
+                download(base, downloadPath, i+"_"+dir, () -> {
+                    ReqResult reqResult = Http.request(finalUri, null);
+                    if (!reqResult.isSuccess()) {
                         throw new IOException(String.format("req uri: %s failed", finalUri));
                     }
-                    if (!reqResult.isM3u8File()){
+                    if (!reqResult.isM3u8File()) {
                         throw new IllegalStateException(String.format("'%s' is not a m3u8 file", finalUri));
                     }
                     return new M3u8Parser().parse(new InputStreamReader(reqResult.getInputStream()));
@@ -166,6 +168,7 @@ public class Downloader {
             int readSlices=0;
             List<Context.Entry> entries=new ArrayList<>();
             List<CompletableFuture<Void>> futures=new ArrayList<>();
+            ProgressGroup group=new ProgressGroup();
 
             do {
                 long now=System.currentTimeMillis();
@@ -176,8 +179,8 @@ public class Downloader {
 
                     ProgressBar progressBar = new ProgressBar( 50, filePath.getFileName() + "");
                     progressBar.setMessage("request...");
-                    DL.GROUP.addBar(progressBar);
-                    DL.GROUP.report(null);
+                    group.addBar(progressBar);
+                    group.report();
                     MediaDownloader mediaDownload = new MediaDownloader(finalBaseUri, filePath, media, progressBar);
 
                     var future=mediaDownload.start(0);
@@ -192,11 +195,11 @@ public class Downloader {
                     MediaList mediaList = context.getPlayListFile();
                     long sleepMillis=((long) (mediaList.getTargetDuration()*1000)-(System.currentTimeMillis()-now));
                     if (sleepMillis>0) {
-                        sleepWithShowProgress(sleepMillis);
+                        sleepAndShowProgress(group,sleepMillis);
                     }
                     boolean change=context.append((MediaList) playListProvider.getFile());
                     while (!change){
-                        sleepWithShowProgress(mediaList.getTargetDuration()*1000/2);
+                        sleepAndShowProgress(group,mediaList.getTargetDuration()*1000/2);
                         change=context.append((MediaList) playListProvider.getFile());
                     }
                 }
@@ -207,7 +210,7 @@ public class Downloader {
 
             tryThrow(futures);
 
-            DL.GROUP.reportAwait();
+            group.reportAwait();
 
             tryThrow(futures);
 
@@ -231,10 +234,11 @@ public class Downloader {
         }
     }
 
-    private void sleepWithShowProgress(long millis) throws InterruptedException {
+
+    private void sleepAndShowProgress(ProgressGroup group,long millis) throws InterruptedException {
         long delay=System.currentTimeMillis()+millis;
         while (System.currentTimeMillis()<delay){
-            DL.GROUP.report(null);
+            group.report();
             Thread.sleep(200);
         }
 
@@ -344,10 +348,6 @@ public class Downloader {
                     if (progressBar.getTotal()- progressBar.getCurrent()<=16)
                         progressBar.complete();
                 }
-//                if (!progressBar.isDone()){
-//                    System.out.println(progressBar.getTotal()-progressBar.getCurrent());
-//                }
-//                progressBar.complete();
             }
         }
 
