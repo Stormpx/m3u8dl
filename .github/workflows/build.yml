@@ -1,0 +1,77 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
+
+name: build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: make gradlew executable
+      run: chmod +x ./gradlew
+    - uses: actions/setup-java@v2
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        gradle-version: wrapper
+        arguments: build
+    - uses: actions/upload-artifact@v2
+      with:
+        name: package
+        path: build/libs
+        
+  build-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - name: Setup jdk
+      uses: graalvm/setup-graalvm@v1
+      with:
+        version: 'latest'
+        java-version: '17'
+        components: 'native-image'
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1  
+    - uses: actions/download-artifact@v2
+      with:
+        name: package
+    - name: Build
+      run: native-image.cmd -jar m3u8dl-1.0.jar m3u8dl-windows
+    - uses: actions/upload-artifact@v2
+      with:
+        name: m3u8dl-windows.exe
+        path: m3u8dl*
+        
+  build-linux:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup jdk
+      uses: graalvm/setup-graalvm@v1
+      with:
+        version: 'latest'
+        java-version: '17'
+        components: 'native-image'
+    - uses: actions/download-artifact@v2
+      with:
+        name: package
+    - name: build
+      run: native-image -jar m3u8dl-1.0.jar m3u8dl-linux
+    - uses: actions/upload-artifact@v2
+      with:
+        name: m3u8dl-linux
+        path: m3u8dl*
+      
+        
