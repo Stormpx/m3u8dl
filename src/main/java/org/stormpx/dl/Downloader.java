@@ -14,7 +14,7 @@ import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -39,6 +39,11 @@ public class Downloader {
         this.baseUri = baseUri;
         this.workPath = workPath;
         this.executor=executor;
+    }
+
+    public Downloader setRetry(int retry) {
+        this.retry = retry;
+        return this;
     }
 
     public Downloader setReload(boolean reload) {
@@ -96,16 +101,19 @@ public class Downloader {
 
     public void downloadByFile(Path path) throws Throwable{
         Objects.requireNonNull(this.baseUri,"baseUri is required");
-        File file = path.toFile();
-        if (!file.exists()||!file.isFile()){
-            DL.perr(path + " not exists.");
+        if (!Files.exists(path)){
+            DL.perr(path + " is not exists.");
+            return;
+        }
+        if (!Files.isRegularFile(path)){
+            DL.perr(path + " is not regular file.");
+            return;
         }
         String dirName=Strs.removeExt(path.getFileName().toString());
         DL.poutln("filePath: "+ path);
 
         download(baseUri,null,dirName,()->{
-            FileReader reader = new FileReader(file, StandardCharsets.UTF_8);
-            return new M3u8Parser().parse(reader);
+            return new M3u8Parser().parse(Files.newBufferedReader(path));
         });
     }
 
@@ -296,7 +304,6 @@ public class Downloader {
                             progressBar.setMessage(null);
                             Integer contentLength = reqResult.getContentLength();
                             InputStream inputStream = reqResult.getInputStream();
-                            File targetFile = filePath.toFile();
 
                             progressBar.setTotal(contentLength);
 
@@ -304,11 +311,11 @@ public class Downloader {
                             if (encryptInfo !=null){
                                 if (encryptInfo.getMethod() != EncryptMethod.NONE){
                                     return ciphers.createCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo)
-                                            .thenCompose(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),targetFile));
+                                            .thenCompose(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),filePath));
                                 }
                             }
 
-                            return write2FileFuture(inputStream,targetFile);
+                            return write2FileFuture(inputStream,filePath);
 
                     })
                     .exceptionallyCompose(t->{
@@ -323,7 +330,7 @@ public class Downloader {
 
         }
 
-        private CompletableFuture<Void> write2FileFuture(InputStream inputStream, File targetFile){
+        private CompletableFuture<Void> write2FileFuture(InputStream inputStream, Path targetFile){
             try {
                 write2File(inputStream,targetFile);
                 return CompletableFuture.completedFuture(null);
@@ -332,10 +339,10 @@ public class Downloader {
             }
         }
 
-        private void write2File(InputStream inputStream, File targetFile) throws IOException {
+        private void write2File(InputStream inputStream, Path targetFile) throws IOException {
             byte[] buffer = DLThreadContext.current().getBuffer();
             try (InputStream in=inputStream;
-                 FileOutputStream out = new FileOutputStream(targetFile, false)){
+                 OutputStream out=Files.newOutputStream(targetFile, StandardOpenOption.CREATE)){
 
                 int dataRead;
                 while ((dataRead= in.read(buffer))!=-1){

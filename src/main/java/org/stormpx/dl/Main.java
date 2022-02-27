@@ -53,13 +53,14 @@ public class Main {
 
     private static void printHelps(){
         String helps= """
-                Usage: m3u8dl [options] url
+                Usage: m3u8dl [options] <url|file>
                     -b --baseUrl <baseUrl>
                     -d --workDir <directory> set directory to save segment
                     -t --thread <number> set download threads
                     -m --maxSegment <number> set maximum number of segment to download
                     --proxy <address> set proxy. eg http://127.0.0.1:8889
                     -r --reload set to enable live streaming download. default: false
+                    --retry <number> 
                     -ua --userAgent <userAgent> send custom ua to server
                 """;
 
@@ -73,6 +74,7 @@ public class Main {
         URI baseUri=null;
         int thread=Runtime.getRuntime().availableProcessors();
         int maxSegment=Integer.MAX_VALUE;
+        int retry=10;
         boolean reload=false;
         boolean merge=false;
         URI proxyAddr=null;
@@ -112,6 +114,11 @@ public class Main {
                         String proxyStr=getString(arg,args,++readIdx);
                         proxyAddr=new URI(proxyStr);
                         continue;
+                    case "--retry":
+                        Integer retryN = getInt(arg,args, ++readIdx);
+                        if (retryN!=null){
+                            retry=retryN;
+                        }
                     case "-ua":
                     case "--userAgent":
                         userAgent= getString(arg,args, ++readIdx);
@@ -150,6 +157,7 @@ public class Main {
 
             Http.build(proxyAddr,userAgent,threadPool);
             Downloader downloader = new Downloader(baseUri,workDir,threadPool)
+                    .setRetry(retry)
                     .setReload(reload)
                     .setMerge(merge)
                     .setMaximumSegment(maxSegment)
