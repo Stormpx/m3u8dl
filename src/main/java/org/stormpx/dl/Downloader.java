@@ -13,7 +13,6 @@ import org.stormpx.dl.m3u8.play.Segment;
 import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -30,7 +29,7 @@ public class Downloader {
     private Path workPath;
     private int retry=10;
     private boolean reload =false;
-    private boolean merge=false;
+    private boolean concat =false;
     private int maximumSegment =Integer.MAX_VALUE;
     private DLCiphers ciphers;
 
@@ -51,8 +50,8 @@ public class Downloader {
         return this;
     }
 
-    public Downloader setMerge(boolean merge) {
-        this.merge = merge;
+    public Downloader setConcat(boolean concat) {
+        this.concat = concat;
         return this;
     }
 
@@ -223,8 +222,8 @@ public class Downloader {
             tryThrow(futures);
 
             System.out.println();
-            if (this.merge)
-                merge(entries,downloadPath);
+            if (this.concat)
+                concat(entries,downloadPath);
         }
 
 
@@ -252,11 +251,12 @@ public class Downloader {
 
     }
 
-    private void merge(List<Context.Entry> entries,Path dirPath) throws IOException {
-        File allInOneFile=dirPath.getParent().resolve(dirPath.getFileName()+".ts").toFile();
+    private void concat(List<Context.Entry> entries, Path dirPath) throws IOException {
+        Path tsPath = dirPath.getParent().resolve(dirPath.getFileName() + ".ts");
+        File allInOneFile= tsPath.toFile();
         byte[] buffer=new byte[16*1024];
         try (OutputStream out = new FileOutputStream(allInOneFile)){
-            DL.poutln("segment merging..");
+            DL.poutln("try concat & remuxing");
             for (Context.Entry entry : entries) {
                 File file = entry.getPath(dirPath).toFile();
                 try (InputStream in=new FileInputStream(file)){
@@ -266,9 +266,13 @@ public class Downloader {
                     }
                 }
             }
-            DL.poutln("merge done..");
+            DL.poutln("concat done..");
         }
 
+        if (DL.remuxing(tsPath, dirPath.getParent().resolve(dirPath.getFileName()+".mp4"))){
+            System.out.println("remuxing success..");
+            allInOneFile.delete();
+        }
 
     }
 

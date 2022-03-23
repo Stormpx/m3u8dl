@@ -1,8 +1,6 @@
 package org.stormpx.dl.kit;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -47,5 +45,52 @@ public class DL {
             }
         }
     }
+
+
+    public static String getPlatform(){
+        String osName = System.getProperty("os.name");
+        if (osName.contains("windows")){
+            return "windows";
+        }else{
+            return "linux";
+        }
+    }
+
+//    public static void loadLib(){
+//        load("avcodec");
+//        load("avformat");
+//        load("avutil");
+//        load("dl");
+//    }
+//
+//    public static void load(String lib){
+//        try {
+//            System.out.println(System.mapLibraryName(lib));
+//            System.loadLibrary(lib);
+//        }catch (Exception e){
+//            e.printStackTrace();
+//        }
+//    }
+
+    public static boolean remuxing(Path in,Path out){
+        try {
+            var process=Runtime.getRuntime()
+                    .exec(new String[]{"ffmpeg", "-y","-i",in.toAbsolutePath().toString(),"-c","copy",out.toAbsolutePath().toString()});
+            int exitCode=process.waitFor();
+            if (exitCode!=0) {
+                BufferedReader reader = process.errorReader();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            }
+            return exitCode==0;
+        } catch (Exception e) {
+            throw new RuntimeException("remuxing failed. "+e.getMessage(),e);
+        }
+
+    }
+
+//    public native static void remuxing(String inPath,String outPath);
 
 }

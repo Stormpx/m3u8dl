@@ -3,22 +3,11 @@ package org.stormpx.dl;
 
 import org.stormpx.dl.kit.DL;
 import org.stormpx.dl.kit.Http;
-import org.stormpx.dl.kit.Lambdas;
-import org.stormpx.dl.kit.Strs;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.Scanner;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -60,6 +49,7 @@ public class Main {
                     -m --maxSegment <number> set maximum number of segment to download
                     --proxy <address> set proxy. eg http://127.0.0.1:8889
                     -r --reload set to enable live streaming download. default: false
+                    --concat concat segment file & try remuxing to .mp4 file
                     --retry <number> 
                     -ua --userAgent <userAgent> send custom ua to server
                 """;
@@ -76,7 +66,7 @@ public class Main {
         int maxSegment=Integer.MAX_VALUE;
         int retry=10;
         boolean reload=false;
-        boolean merge=false;
+        boolean concat=false;
         URI proxyAddr=null;
         Path workDir= Paths.get(System.getProperty("user.dir"));
 
@@ -139,8 +129,8 @@ public class Main {
                             maxSegment=m;
                         }
                         continue;
-                    case "--merge":
-                        merge=true;
+                    case "--concat":
+                        concat=true;
                         continue;
                     default:
                         if (arg.startsWith("-"))
@@ -159,7 +149,7 @@ public class Main {
             Downloader downloader = new Downloader(baseUri,workDir,threadPool)
                     .setRetry(retry)
                     .setReload(reload)
-                    .setMerge(merge)
+                    .setConcat(concat)
                     .setMaximumSegment(maxSegment)
                     ;
 
