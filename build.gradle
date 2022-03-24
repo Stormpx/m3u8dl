@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'org.stormpx'
-version '1.0'
+version '0.1.0'
 
 sourceCompatibility = 17
 
@@ -17,6 +17,12 @@ compileJava.options.encoding = 'UTF-8'
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
+}
+
+task getVersion {
+    doLast {
+        println project.version
+    }
 }
 
 application {
