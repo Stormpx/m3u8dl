@@ -50,7 +50,7 @@ jobs:
       with:
         name: package
     - name: Build
-      run: native-image.cmd -jar m3u8dl-$(cat ./version).jar m3u8dl-$(cat ./version)-windows.exe
+      run: native-image.cmd -jar m3u8dl-$(cat ./version).jar m3u8dl-$(cat ./version)-windows
     - uses: actions/upload-artifact@v2
       with:
         name: m3u8dl-windows.exe
