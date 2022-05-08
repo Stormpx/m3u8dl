@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id "com.github.johnrengelman.shadow" version "7.1.2"
+//    id "com.github.johnrengelman.shadow" version "7.1.2"
 }
 
 group 'org.stormpx'
@@ -29,11 +29,11 @@ application {
     mainClass = project.ext.mainclass
 }
 
-shadowJar {
-    archiveBaseName.set('m3u8dl')
-    archiveClassifier.set('')
-    archiveVersion.set(project.version)
-}
+//shadowJar {
+//    archiveBaseName.set('m3u8dl')
+//    archiveClassifier.set('')
+//    archiveVersion.set(project.version)
+//}
 
 jar {
     manifest {

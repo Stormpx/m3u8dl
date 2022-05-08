@@ -18,7 +18,7 @@ public class Http {
 
     public static void build(URI proxy, String ua, Executor executor){
         var builder=HttpClient.newBuilder()
-//                .executor(executor)
+                .executor(executor)
                 .followRedirects(HttpClient.Redirect.NORMAL);
         if (proxy!=null){
             builder.proxy(new DownloadProxySelector(proxy));
