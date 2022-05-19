@@ -145,7 +145,7 @@ public class Main {
             DL.poutln("workDir: "+workDir);
             ExecutorService threadPool = Executors.newFixedThreadPool(thread);
 
-            Http.build(proxyAddr,userAgent,threadPool);
+            Http.build(proxyAddr,userAgent,Executors.newSingleThreadExecutor());
             Downloader downloader = new Downloader(baseUri,workDir,threadPool)
                     .setRetry(retry)
                     .setReload(reload)

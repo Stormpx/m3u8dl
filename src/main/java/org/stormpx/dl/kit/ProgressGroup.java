@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 
+@Deprecated
 public class ProgressGroup {
 
     private List<ProgressBar> progressBars;

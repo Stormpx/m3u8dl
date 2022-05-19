@@ -9,18 +9,20 @@ import org.stormpx.dl.m3u8.master.MasterList;
 import org.stormpx.dl.m3u8.master.StreamInfo;
 import org.stormpx.dl.m3u8.play.MediaList;
 import org.stormpx.dl.m3u8.play.Segment;
+import org.stormpx.dl.task.Progress;
+import org.stormpx.dl.task.TaskManager;
+import org.stormpx.dl.task.TaskUnit;
 
+import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class Downloader {
 
@@ -174,8 +176,7 @@ public class Downloader {
 
             int readSlices=0;
             List<Context.Entry> entries=new ArrayList<>();
-            List<CompletableFuture<Void>> futures=new ArrayList<>();
-            ProgressGroup group=new ProgressGroup();
+            TaskManager taskManager = new TaskManager(executor);
 
             do {
                 long now=System.currentTimeMillis();
@@ -183,43 +184,28 @@ public class Downloader {
 
                 readSlices+=context.read(this.maximumSegment-readSlices, media -> {
                     Path filePath = media.getPath(downloadPath);
-
-                    ProgressBar progressBar = new ProgressBar( 50, filePath.getFileName() + "");
-                    progressBar.setMessage("request...");
-                    group.addBar(progressBar);
-                    group.report();
-                    MediaDownloader mediaDownload = new MediaDownloader(finalBaseUri, filePath, media, progressBar);
-
-                    var future=mediaDownload.start(0);
-
-                    futures.add(future);
+                    taskManager.execute(filePath.getFileName().toString(),new MediaDownloader(finalBaseUri, filePath, media));
                     entries.add(media);
                 });
 
-                tryThrow(futures);
 
                 if (context.shouldReload()&&this.reload &&readSlices< maximumSegment){
                     MediaList mediaList = context.getPlayListFile();
                     long sleepMillis=((long) (mediaList.getTargetDuration()*1000)-(System.currentTimeMillis()-now));
                     if (sleepMillis>0) {
-                        sleepAndShowProgress(group,sleepMillis);
+                        sleepWithShowProgress(taskManager,sleepMillis);
                     }
                     boolean change=context.append((MediaList) playListProvider.getFile());
                     while (!change){
-                        sleepAndShowProgress(group,mediaList.getTargetDuration()*1000/2);
+                        sleepWithShowProgress(taskManager,mediaList.getTargetDuration()*1000/2);
                         change=context.append((MediaList) playListProvider.getFile());
                     }
                 }
 
-                tryThrow(futures);
 
             }while (context.shouldReload()&&this.reload &&readSlices< maximumSegment);
 
-            tryThrow(futures);
-
-            group.reportAwait();
-
-            tryThrow(futures);
+            awaitComplete(taskManager);
 
             System.out.println();
             if (this.concat)
@@ -229,27 +215,46 @@ public class Downloader {
 
     }
 
-    private void tryThrow(List<CompletableFuture<Void>> futures) throws Exception {
-        Iterator<CompletableFuture<Void>> iterator = futures.iterator();
-        while (iterator.hasNext()){
-            CompletableFuture<Void> future = iterator.next();
-            if (future.isDone()){
-                //throw
-                future.get(3, TimeUnit.SECONDS);
-                iterator.remove();
-            }
+    private void printProgress(TaskManager taskManager){
+
+        Progress progress = taskManager.getProgress();
+        Progress latestProgress = taskManager.generateProgress();
+
+        if (progress!=null){
+            System.out.printf("\r%s",progress.placeHolder());
         }
+
+        System.out.printf("\r%s",latestProgress.getPretty());
+
+    }
+
+    private void assertNoException(TaskManager taskManager) throws Exception {
+        Collection<Exception> exceptions = taskManager.exceptions();
+        if (exceptions!=null)
+            throw exceptions.iterator().next();
     }
 
 
-    private void sleepAndShowProgress(ProgressGroup group,long millis) throws InterruptedException {
+    private void awaitComplete(TaskManager taskManager) throws Exception {
+
+        while (!taskManager.isAllDone()){
+            printProgress(taskManager);
+            assertNoException(taskManager);
+            Thread.sleep(100);
+        }
+
+    }
+
+    private void sleepWithShowProgress(TaskManager taskManager, long millis) throws Exception {
         long delay=System.currentTimeMillis()+millis;
         while (System.currentTimeMillis()<delay){
-            group.report();
+            printProgress(taskManager);
+            assertNoException(taskManager);
             Thread.sleep(200);
         }
 
     }
+
 
     private void concat(List<Context.Entry> entries, Path dirPath) throws IOException {
         Path tsPath = dirPath.getParent().resolve(dirPath.getFileName() + ".ts");
@@ -282,68 +287,55 @@ public class Downloader {
 
     }
 
-    private class MediaDownloader {
+    private class MediaDownloader implements Consumer<TaskUnit> {
         private URI baseUri;
         private Path filePath;
         private Context.MediaEntry media;
-        private ProgressBar progressBar;
 
-        public MediaDownloader(URI baseUri, Path downloadPath, Context.MediaEntry media, ProgressBar progressBar) {
+        public MediaDownloader(URI baseUri, Path downloadPath, Context.MediaEntry media) {
             this.baseUri = baseUri;
             this.filePath = downloadPath;
             this.media = media;
-            this.progressBar = progressBar;
         }
 
-        public CompletableFuture<Void> start(int num)  {
-            return Http.requestAsync(media.getUri(), media.getByteRange())
-                    .thenCompose(reqResult -> {
-                            if (!reqResult.isSuccess()) {
-                                return CompletableFuture.failedFuture(new RuntimeException("request ts failed..."));
-                            }
-                            if (reqResult.isM3u8File()) {
-                                progressBar.failed(".m3u8 file detected. pass... ");
-                                return CompletableFuture.completedFuture(null);
-                            }
-                            progressBar.setMessage(null);
-                            Integer contentLength = reqResult.getContentLength();
-                            InputStream inputStream = reqResult.getInputStream();
-
-                            progressBar.setTotal(contentLength);
-
-                            EncryptInfo encryptInfo = media.getEncryptInfo();
-                            if (encryptInfo !=null){
-                                if (encryptInfo.getMethod() != EncryptMethod.NONE){
-                                    return ciphers.createCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo)
-                                            .thenCompose(cipher -> write2FileFuture(new CipherInputStream(inputStream,cipher),filePath));
-                                }
-                            }
-
-                            return write2FileFuture(inputStream,filePath);
-
-                    })
-                    .exceptionallyCompose(t->{
-                        if (num<retry){
-                            progressBar.setMessage(String.format("retry %d/%d",num+1,retry));
-                            return start(num+1);
-                        }else{
-                            progressBar.failed("download failed...");
-                            return CompletableFuture.failedFuture(t);
-                        }
-                    });
-
-        }
-
-        private CompletableFuture<Void> write2FileFuture(InputStream inputStream, Path targetFile){
+        @Override
+        public void accept(TaskUnit taskUnit) {
             try {
-                write2File(inputStream,targetFile);
-                return CompletableFuture.completedFuture(null);
-            } catch (IOException e) {
-                return CompletableFuture.failedFuture(e);
+                start(0,taskUnit);
+            } catch (IOException | ExecutionException | InterruptedException e) {
+                throw new RuntimeException(e);
             }
         }
 
-        private void write2File(InputStream inputStream, Path targetFile) throws IOException {
+        public void start(int num,TaskUnit taskUnit) throws IOException, ExecutionException, InterruptedException {
+            ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());
+            if (!reqResult.isSuccess()) {
+                taskUnit.complete(new RuntimeException("request ts failed..."));
+            }
+            if (reqResult.isM3u8File()) {
+                //.m3u8 file detected. pass...
+                taskUnit.complete(new RuntimeException(""));
+            }
+            taskUnit.setMessage(null);
+            Integer contentLength = reqResult.getContentLength();
+            InputStream inputStream = reqResult.getInputStream();
+
+            taskUnit.setTotal(contentLength);
+
+            EncryptInfo encryptInfo = media.getEncryptInfo();
+            if (encryptInfo !=null){
+                if (encryptInfo.getMethod() != EncryptMethod.NONE){
+                    Cipher cipher = ciphers.createCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo).get();
+                    inputStream=new CipherInputStream(inputStream,cipher);
+                }
+            }
+
+            write2File(inputStream,filePath,taskUnit);
+
+        }
+
+
+        private void write2File(InputStream inputStream, Path targetFile,TaskUnit unit) throws IOException {
             byte[] buffer = DLThreadContext.current().getBuffer();
             try (InputStream in=inputStream;
                  OutputStream out=Files.newOutputStream(targetFile, StandardOpenOption.CREATE)){
@@ -352,15 +344,16 @@ public class Downloader {
                 while ((dataRead= in.read(buffer))!=-1){
                     out.write(buffer,0,dataRead);
                     out.flush();
-                    progressBar.stepBy(dataRead);
+                    unit.stepBy(dataRead);
                 }
-
-                if (!progressBar.isDone()){
-                    if (progressBar.getTotal()- progressBar.getCurrent()<=16)
-                        progressBar.complete();
+                if (unit.getTotal()-unit.getCurrent()<=16) {
+                    unit.complete(null);
+                }else{
+                    unit.complete(new RuntimeException("stream end.."));
                 }
             }
         }
+
 
     }
 

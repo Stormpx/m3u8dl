@@ -1,7 +1,7 @@
 package org.stormpx.dl.kit;
 
 import java.time.Instant;
-
+@Deprecated
 public class ProgressBar {
 
     private int total;
