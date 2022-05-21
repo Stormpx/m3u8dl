@@ -3,7 +3,6 @@ package org.stormpx.dl.task;
 import org.stormpx.dl.kit.Strs;
 
 public class Progress {
-    private long timestamp;
     private String message;
     private long completedTasks;
     private long totalTask;
@@ -14,8 +13,7 @@ public class Progress {
 
     private String pretty;
 
-    public Progress(long timestamp, String message, long completedTasks, long totalTask, long currentBytes, long totalBytes, long speed) {
-        this.timestamp = timestamp;
+    public Progress(String message, long completedTasks, long totalTask, long currentBytes, long totalBytes, long speed) {
         this.message = message;
         this.completedTasks = completedTasks;
         this.totalTask = totalTask;
@@ -25,9 +23,6 @@ public class Progress {
     }
 
 
-    public long getTimestamp() {
-        return timestamp;
-    }
 
     public String getMessage() {
         return message;
@@ -70,8 +65,4 @@ public class Progress {
         return this.pretty;
     }
 
-    @Override
-    public String toString() {
-        return "Progress{" + "timestamp=" + timestamp + ", message='" + message + '\'' + ", completedTasks=" + completedTasks + ", totalTask=" + totalTask + ", currentBytes=" + currentBytes + ", totalBytes=" + totalBytes + ", speed=" + speed + ", string='" + pretty + '\'' + '}';
-    }
 }

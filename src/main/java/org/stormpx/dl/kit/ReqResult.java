@@ -3,7 +3,7 @@ package org.stormpx.dl.kit;
 import java.io.InputStream;
 import java.net.URI;
 
-public class ReqResult {
+public class ReqResult implements AutoCloseable {
 
     private boolean success;
 
@@ -57,5 +57,11 @@ public class ReqResult {
 
     public Integer getContentLength() {
         return contentLength;
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (inputStream!=null)
+            inputStream.close();
     }
 }

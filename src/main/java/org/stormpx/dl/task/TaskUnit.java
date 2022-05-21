@@ -53,6 +53,9 @@ public class TaskUnit implements Runnable {
     public void complete(Exception e){
         this.done=true;
         this.exception=e;
+        if (e!=null) {
+            this.message = e.getMessage();
+        }
         taskManager.complete(this.id,e);
     }
 

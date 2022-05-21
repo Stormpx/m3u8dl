@@ -230,7 +230,7 @@ public class Downloader {
 
     private void assertNoException(TaskManager taskManager) throws Exception {
         Collection<Exception> exceptions = taskManager.exceptions();
-        if (exceptions!=null)
+        if (!exceptions.isEmpty())
             throw exceptions.iterator().next();
     }
 
@@ -302,36 +302,44 @@ public class Downloader {
         public void accept(TaskUnit taskUnit) {
             try {
                 start(0,taskUnit);
-            } catch (IOException | ExecutionException | InterruptedException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
 
-        public void start(int num,TaskUnit taskUnit) throws IOException, ExecutionException, InterruptedException {
-            ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());
-            if (!reqResult.isSuccess()) {
-                taskUnit.complete(new RuntimeException("request ts failed..."));
-            }
-            if (reqResult.isM3u8File()) {
-                //.m3u8 file detected. pass...
-                taskUnit.complete(new RuntimeException(""));
-            }
-            taskUnit.setMessage(null);
-            Integer contentLength = reqResult.getContentLength();
-            InputStream inputStream = reqResult.getInputStream();
-
-            taskUnit.setTotal(contentLength);
-
-            EncryptInfo encryptInfo = media.getEncryptInfo();
-            if (encryptInfo !=null){
-                if (encryptInfo.getMethod() != EncryptMethod.NONE){
-                    Cipher cipher = ciphers.createCipherAsync(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo).get();
-                    inputStream=new CipherInputStream(inputStream,cipher);
+        public void start(int num,TaskUnit taskUnit) throws Exception {
+            try (ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());){
+                if (!reqResult.isSuccess()) {
+                    taskUnit.complete(new RuntimeException("request ts failed..."));
                 }
+                if (reqResult.isM3u8File()) {
+                    // pass...
+                    taskUnit.complete(new RuntimeException("unexpect .m3u8 file detected."));
+                }
+                taskUnit.setMessage(null);
+                Integer contentLength = reqResult.getContentLength();
+                InputStream inputStream = reqResult.getInputStream();
+
+                taskUnit.setTotal(contentLength);
+
+                EncryptInfo encryptInfo = media.getEncryptInfo();
+                if (encryptInfo !=null){
+                    if (encryptInfo.getMethod() != EncryptMethod.NONE){
+                        Cipher cipher = ciphers.createCipher(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo);
+                        inputStream=new CipherInputStream(inputStream,cipher);
+                    }
+                }
+
+                write2File(inputStream,filePath,taskUnit);
+            } catch (Exception e) {
+                if (num < retry) {
+                    taskUnit.setMessage("retry %d/%d".formatted(num,retry));
+                    start(num + 1, taskUnit);
+                } else {
+                    throw e;
+                }
+
             }
-
-            write2File(inputStream,filePath,taskUnit);
-
         }
 
 

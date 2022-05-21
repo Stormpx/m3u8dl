@@ -16,6 +16,9 @@ public class TaskManager {
     private long totalTask;
     private long completedTasks;
 
+    private long timestamp;
+    private long speed;
+    private long finished;
     private Progress progress;
 
     public TaskManager(Executor executor) {
@@ -52,8 +55,19 @@ public class TaskManager {
         return totalTask==completedTasks;
     }
 
+    private long calculateSpeed(long finished){
+        long now = System.currentTimeMillis();
+
+        if ((now-timestamp)/1000>=1){
+            this.timestamp=now;
+            this.speed=finished-this.finished;
+            this.finished=finished;
+        }
+
+        return this.speed;
+    }
+
     public Progress generateProgress(){
-        long now = System.currentTimeMillis() ;
 
         String message="";
         long currentBytes=0;
@@ -65,13 +79,10 @@ public class TaskManager {
             currentBytes+=unit.getCurrent();
             totalBytes+=unit.getTotal();
         }
-        long speed=currentBytes;
-        Progress progress = this.progress;
-        if (progress !=null&&(now -progress.getTimestamp())/1000>=1){
-            speed=currentBytes-progress.getCurrentBytes();
-        }
+        long speed=calculateSpeed(currentBytes);
 
-        this.progress=new Progress(now,message,completedTasks,totalTask,currentBytes,totalBytes,speed);
+        this.progress=new Progress(message,completedTasks,totalTask,currentBytes,totalBytes,speed);
+
         return this.progress;
     }
 
