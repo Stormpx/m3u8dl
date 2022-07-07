@@ -141,6 +141,7 @@ public class Main {
                 }
             }
 
+            System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(thread));
             System.out.println("threads: "+thread);
             DL.poutln("workDir: "+workDir);
             ExecutorService threadPool = Executors.newFixedThreadPool(thread);
