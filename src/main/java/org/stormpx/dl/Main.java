@@ -145,8 +145,11 @@ public class Main {
             System.out.println("threads: "+thread);
             DL.poutln("workDir: "+workDir);
             ExecutorService threadPool = Executors.newFixedThreadPool(thread);
-
-            Http.build(proxyAddr,userAgent,Executors.newSingleThreadExecutor());
+            Http.build(proxyAddr,userAgent,Executors.newSingleThreadExecutor(r-> {
+                var t= new Thread(r,"HttpClient-Thread");
+                t.setDaemon(true);
+                return t;
+            }));
             Downloader downloader = new Downloader(baseUri,workDir,threadPool)
                     .setRetry(retry)
                     .setReload(reload)

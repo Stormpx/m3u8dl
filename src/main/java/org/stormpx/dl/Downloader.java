@@ -242,6 +242,7 @@ public class Downloader {
             assertNoException(taskManager);
             Thread.sleep(100);
         }
+        printProgress(taskManager);
 
     }
 
