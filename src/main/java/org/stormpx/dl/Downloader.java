@@ -19,8 +19,6 @@ import java.io.*;
 import java.net.URI;
 import java.nio.file.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -85,7 +83,7 @@ public class Downloader {
         URI relativeUri = base.relativize(uri);
         String dirName = Strs.removeExt(relativeUri.toString());
 
-        DL.poutln("uri: "+uri);
+        DL.perrln("uri: "+uri);
         download(this.baseUri!=null?this.baseUri:base,null,dirName,()->{
             ReqResult reqResult = Http.request(uri,null);
             if (!reqResult.isSuccess()){
@@ -103,15 +101,15 @@ public class Downloader {
     public void downloadByFile(Path path) throws Throwable{
         Objects.requireNonNull(this.baseUri,"baseUri is required");
         if (!Files.exists(path)){
-            DL.perr(path + " is not exists.");
+            DL.perrln(path + " is not exists.");
             return;
         }
         if (!Files.isRegularFile(path)){
-            DL.perr(path + " is not regular file.");
+            DL.perrln(path + " is not regular file.");
             return;
         }
         String dirName=Strs.removeExt(path.getFileName().toString());
-        DL.poutln("filePath: "+ path);
+        DL.perrln("filePath: "+ path);
 
         download(baseUri,null,dirName,()->{
             return new M3u8Parser().parse(Files.newBufferedReader(path));
@@ -132,7 +130,7 @@ public class Downloader {
 
         PlayList playList = playListProvider.getFile();
         if (!playList.isMediaFile()){
-            DL.poutln("master list file detected..");
+            DL.perrln("master list file detected..");
             //master
             MasterList masterList= (MasterList) playList;
 
@@ -151,7 +149,7 @@ public class Downloader {
 
                 URI finalUri = uri;
                 //download stream
-                DL.poutln("try download variant stream: " + uri);
+                DL.perrln("try download variant stream: " + uri);
                 download(base, downloadPath, i+"_"+dir, () -> {
                     ReqResult reqResult = Http.request(finalUri, null);
                     if (!reqResult.isSuccess()) {
@@ -171,7 +169,7 @@ public class Downloader {
             Context context = new Context(baseUri, dirName,null, (MediaList) playList);
 
             if (context.shouldReload()){
-                DL.poutln("live streaming file detected..");
+                DL.perrln("live streaming file detected..");
             }
 
             int readSlices=0;
@@ -197,7 +195,7 @@ public class Downloader {
                     }
                     boolean change=context.append((MediaList) playListProvider.getFile());
                     while (!change){
-                        sleepWithShowProgress(taskManager,mediaList.getTargetDuration()*1000/2);
+                        sleepWithShowProgress(taskManager, (long) (mediaList.getTargetDuration()*1000/2));
                         change=context.append((MediaList) playListProvider.getFile());
                     }
                 }
@@ -216,15 +214,14 @@ public class Downloader {
     }
 
     private void printProgress(TaskManager taskManager){
-
         Progress progress = taskManager.getProgress();
         Progress latestProgress = taskManager.generateProgress();
 
         if (progress!=null){
-            System.out.printf("\r%s",progress.placeHolder());
+            DL.perr("\r%s", progress.placeHolder());
         }
 
-        System.out.printf("\r%s",latestProgress.getPretty());
+        DL.perr("\r%s",latestProgress.getPretty());
 
     }
 
@@ -262,7 +259,7 @@ public class Downloader {
         File allInOneFile= tsPath.toFile();
         byte[] buffer=new byte[16*1024];
         try (OutputStream out = new FileOutputStream(allInOneFile)){
-            DL.poutln("try concat & remuxing");
+            DL.perrln("try concat & remuxing");
             for (Context.Entry entry : entries) {
                 File file = entry.getPath(dirPath).toFile();
                 try (InputStream in=new FileInputStream(file)){
@@ -272,11 +269,11 @@ public class Downloader {
                     }
                 }
             }
-            DL.poutln("concat done..");
+            DL.perrln("concat done..");
         }
 
         if (DL.remuxing(tsPath, dirPath.getParent().resolve(dirPath.getFileName()+".mp4"))){
-            System.out.println("remuxing success..");
+            DL.perrln("remuxing success..");
             allInOneFile.delete();
         }
 
@@ -347,7 +344,7 @@ public class Downloader {
         private void write2File(InputStream inputStream, Path targetFile,TaskUnit unit) throws IOException {
             byte[] buffer = DLThreadContext.current().getBuffer();
             try (InputStream in=inputStream;
-                 OutputStream out=Files.newOutputStream(targetFile, StandardOpenOption.CREATE)){
+                 OutputStream out=Files.newOutputStream(targetFile, StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING)){
 
                 int dataRead;
                 while ((dataRead= in.read(buffer))!=-1){

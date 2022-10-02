@@ -23,8 +23,12 @@ public class DL {
         System.out.println(s);
     }
 
-    public static void perr(String s){
+    public static void perrln(String s){
         System.err.println(s);
+    }
+
+    public static void perr(String format, Object ... args){
+        System.err.printf(format, args);
     }
 
 
@@ -81,7 +85,7 @@ public class DL {
                 BufferedReader reader = process.errorReader();
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    System.out.println(line);
+                    DL.perrln(line);
                 }
             }
             return exitCode==0;

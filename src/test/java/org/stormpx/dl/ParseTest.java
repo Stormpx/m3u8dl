@@ -15,6 +15,24 @@ import java.util.List;
 
 public class ParseTest {
 
+
+    @Test
+    public void t() throws IOException {
+        var text = """
+                #EXTM3U
+                #EXT-X-VERSION:3
+                #EXT-X-TARGETDURATION:16.500000
+                #EXT-X-MEDIA-SEQUENCE:0
+                #EXTINF:16.500000,
+                6879310.ts
+                #EXT-X-ENDLIST
+                """;
+
+        PlayList playList = new M3u8Parser().parse(new StringReader(text));
+        Assertions.assertTrue(playList.isMediaFile());
+
+    }
+
     @Test
     public void test1() throws IOException {
         String text = """

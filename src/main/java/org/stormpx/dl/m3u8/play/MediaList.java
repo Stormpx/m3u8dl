@@ -10,7 +10,7 @@ import java.util.List;
 
 public class MediaList extends PlayList {
 
-    private Integer targetDuration;
+    private Double targetDuration;
 
     private long mediaSequence=0;
 
@@ -44,11 +44,11 @@ public class MediaList extends PlayList {
         return true;
     }
 
-    public Integer getTargetDuration() {
+    public Double getTargetDuration() {
         return targetDuration;
     }
 
-    public MediaList setTargetDuration(Integer targetDuration) {
+    public MediaList setTargetDuration(Double targetDuration) {
         this.targetDuration = targetDuration;
         return this;
     }

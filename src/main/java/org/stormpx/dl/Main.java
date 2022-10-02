@@ -16,7 +16,7 @@ public class Main {
 
     public static Integer getInt(String option,String[] args,int index){
         if (index>=args.length){
-            DL.perr(option+": requires argument");
+            DL.perrln(option+": requires argument");
             System.exit(128);
         }
         var str=args[index];
@@ -24,7 +24,7 @@ public class Main {
         try {
             i = Integer.parseInt(str);
             if (i<=0){
-                DL.perr(option+": expected argument > 0");
+                DL.perrln(option+": expected argument > 0");
             }
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(option+": invalid number of "+str);
@@ -34,7 +34,7 @@ public class Main {
 
     public static String getString(String option,String[] args,int index){
         if (index>=args.length){
-            DL.perr(option + ": requires argument");
+            DL.perrln(option + ": requires argument");
             System.exit(128);
         }
         return args[index];
@@ -50,11 +50,12 @@ public class Main {
                     --proxy <address> set proxy. eg http://127.0.0.1:8889
                     -r --reload set to enable live streaming download. default: false
                     --concat concat segment file & try remuxing to .mp4 file
-                    --retry <number> 
+                    --retry <number>
+                    --raw
                     -ua --userAgent <userAgent> send custom ua to server
                 """;
 
-        System.out.println(helps);
+        DL.poutln(helps);
         System.exit(0);
     }
 
@@ -134,16 +135,15 @@ public class Main {
                         continue;
                     default:
                         if (arg.startsWith("-"))
-                            DL.perr("unrecognized option '"+arg+"'");
+                            DL.perrln("unrecognized option '"+arg+"'");
                         else if (readIdx== args.length-1)
                             SYS_IN=false;
 
                 }
             }
-
-            System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(thread));
-            System.out.println("threads: "+thread);
-            DL.poutln("workDir: "+workDir);
+            //            System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(thread));
+            DL.perrln("threads: "+thread);
+            DL.perrln("workDir: "+workDir);
             ExecutorService threadPool = Executors.newFixedThreadPool(thread);
             Http.build(proxyAddr,userAgent,Executors.newSingleThreadExecutor(r-> {
                 var t= new Thread(r,"HttpClient-Thread");
@@ -163,9 +163,8 @@ public class Main {
                 Scanner scan = new Scanner(System.in);
                 while (scan.hasNextLine()) {
                     String input = scan.nextLine();
-                    //                System.out.println(url);
                     downloader.download(input);
-                    DL.poutln("download "+input+" done.");
+                    DL.perrln("download "+input+" done.");
                 }
             }
             //done
@@ -174,7 +173,7 @@ public class Main {
             if (DL.DEBUG) {
                 e.printStackTrace();
             }else {
-                DL.perr(e.getMessage());
+                DL.perrln(e.getMessage());
             }
             System.exit(1);
         }

@@ -149,7 +149,7 @@ public class M3u8Parser {
             String line ;
             while ((line=reader.readLine())!=null){
                 if (DL.VIEW) {
-                    System.out.println(line);
+                    DL.poutln(line);
                 }
                 if (line.isBlank()){
                     continue;
@@ -305,7 +305,7 @@ public class M3u8Parser {
                 } else if (line.startsWith("#EXT-X-VERSION")){
                     this.playListFile.setVersion(Integer.valueOf(Objects.requireNonNull(getTagValue(line))));
                 }else if (line.startsWith("#EXT-X-TARGETDURATION")){
-                    this.playListFile.setTargetDuration(Integer.valueOf(Objects.requireNonNull(getTagValue(line))));
+                    this.playListFile.setTargetDuration(Double.valueOf(Objects.requireNonNull(getTagValue(line))));
                 }else if (line.startsWith("#EXT-X-MEDIA-SEQUENCE")){
                     this.playListFile.setMediaSequence(Long.parseLong(Objects.requireNonNull(getTagValue(line))));
                 }else if (line.startsWith("#EXT-X-PLAYLIST-TYPE")){
@@ -329,7 +329,7 @@ public class M3u8Parser {
                 }
                 this.segment.setUri(line);
 
-                if (this.playListFile.getTargetDuration()!=null&& this.playListFile.getTargetDuration()<Math.round(this.segment.getDuration())){
+                if (this.playListFile.getTargetDuration()!=null&& this.playListFile.getTargetDuration()<this.segment.getDuration()){
                     throw new IllegalStateException("duration of media segment must be <= target duration");
                 }
 
