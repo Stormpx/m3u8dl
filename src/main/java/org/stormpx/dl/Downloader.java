@@ -1,5 +1,6 @@
 package org.stormpx.dl;
 
+import jdk.incubator.concurrent.StructuredTaskScope;
 import org.stormpx.dl.kit.*;
 import org.stormpx.dl.m3u8.EncryptInfo;
 import org.stormpx.dl.m3u8.EncryptMethod;
@@ -17,14 +18,16 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
+import java.nio.channels.Channel;
+import java.nio.channels.Channels;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 public class Downloader {
-
-    private Executor executor;
+    private BufferPool bufferPool;
+//    private Executor executor;
     private URI baseUri;
     private Path workPath;
     private int retry=10;
@@ -33,11 +36,11 @@ public class Downloader {
     private int maximumSegment =Integer.MAX_VALUE;
     private DLCiphers ciphers;
 
-    public Downloader(URI baseUri, Path workPath,Executor executor) {
+    public Downloader(URI baseUri, Path workPath,int concurrency) {
         this.ciphers=new DLCiphers();
         this.baseUri = baseUri;
         this.workPath = workPath;
-        this.executor=executor;
+        this.bufferPool=new BufferPool(concurrency);
     }
 
     public Downloader setRetry(int retry) {
@@ -174,7 +177,7 @@ public class Downloader {
 
             int readSlices=0;
             List<Context.Entry> entries=new ArrayList<>();
-            TaskManager taskManager = new TaskManager(executor);
+            TaskManager taskManager = new TaskManager();
 
             do {
                 long now=System.currentTimeMillis();
@@ -205,7 +208,7 @@ public class Downloader {
 
             awaitComplete(taskManager);
 
-            System.out.println();
+            System.err.println();
             if (this.concat)
                 concat(entries,downloadPath);
         }
@@ -225,18 +228,13 @@ public class Downloader {
 
     }
 
-    private void assertNoException(TaskManager taskManager) throws Exception {
-        Collection<Exception> exceptions = taskManager.exceptions();
-        if (!exceptions.isEmpty())
-            throw exceptions.iterator().next();
-    }
 
 
     private void awaitComplete(TaskManager taskManager) throws Exception {
 
         while (!taskManager.isAllDone()){
             printProgress(taskManager);
-            assertNoException(taskManager);
+            taskManager.throwIfFailed();
             Thread.sleep(100);
         }
         printProgress(taskManager);
@@ -247,7 +245,7 @@ public class Downloader {
         long delay=System.currentTimeMillis()+millis;
         while (System.currentTimeMillis()<delay){
             printProgress(taskManager);
-            assertNoException(taskManager);
+            taskManager.throwIfFailed();
             Thread.sleep(200);
         }
 
@@ -256,13 +254,11 @@ public class Downloader {
 
     private void concat(List<Context.Entry> entries, Path dirPath) throws IOException {
         Path tsPath = dirPath.getParent().resolve(dirPath.getFileName() + ".ts");
-        File allInOneFile= tsPath.toFile();
         byte[] buffer=new byte[16*1024];
-        try (OutputStream out = new FileOutputStream(allInOneFile)){
+        try (OutputStream out = Files.newOutputStream(tsPath,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING)){
             DL.perrln("try concat & remuxing");
             for (Context.Entry entry : entries) {
-                File file = entry.getPath(dirPath).toFile();
-                try (InputStream in=new FileInputStream(file)){
+                try (InputStream in=Files.newInputStream(entry.getPath(dirPath),StandardOpenOption.READ)){
                     int dataRead=-1;
                     while ((dataRead=in.read(buffer))!=-1) {
                         out.write(buffer,0,dataRead);
@@ -274,7 +270,7 @@ public class Downloader {
 
         if (DL.remuxing(tsPath, dirPath.getParent().resolve(dirPath.getFileName()+".mp4"))){
             DL.perrln("remuxing success..");
-            allInOneFile.delete();
+            Files.deleteIfExists(tsPath);
         }
 
     }
@@ -290,6 +286,8 @@ public class Downloader {
         private Path filePath;
         private Context.MediaEntry media;
 
+        private int num;
+
         public MediaDownloader(URI baseUri, Path downloadPath, Context.MediaEntry media) {
             this.baseUri = baseUri;
             this.filePath = downloadPath;
@@ -298,21 +296,32 @@ public class Downloader {
 
         @Override
         public void accept(TaskUnit taskUnit) {
+            byte[] buffer = null;
             try {
-                start(0,taskUnit);
+                buffer = bufferPool.acquire();
+                start(buffer,taskUnit);
             } catch (Exception e) {
                 throw new RuntimeException(e);
+            } finally {
+                if (buffer!=null) {
+                    try {
+                        bufferPool.release(buffer);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
         }
 
-        public void start(int num,TaskUnit taskUnit) throws Exception {
+        public void start(byte[] buffer,TaskUnit taskUnit) throws Exception {
             try (ReqResult reqResult = Http.request(media.getUri(), media.getByteRange());){
                 if (!reqResult.isSuccess()) {
-                    taskUnit.complete(new RuntimeException("request ts failed..."));
+                    throw new RuntimeException("request ts failed...");
                 }
                 if (reqResult.isM3u8File()) {
                     // pass...
                     taskUnit.complete(new RuntimeException("unexpect .m3u8 file detected."));
+                    return;
                 }
                 taskUnit.setMessage(null);
                 Integer contentLength = reqResult.getContentLength();
@@ -321,18 +330,20 @@ public class Downloader {
                 taskUnit.setTotal(contentLength);
 
                 EncryptInfo encryptInfo = media.getEncryptInfo();
-                if (encryptInfo !=null){
-                    if (encryptInfo.getMethod() != EncryptMethod.NONE){
-                        Cipher cipher = ciphers.createCipher(this.baseUri, ((Segment) media.getElement()).getSequence(), encryptInfo);
-                        inputStream=new CipherInputStream(inputStream,cipher);
-                    }
+                if (encryptInfo != null && encryptInfo.shouldDecrypt()) {
+                    Cipher cipher = switch (media.getElement()) {
+                        case Segment seg -> ciphers.createCipher(this.baseUri, seg.getSequence(), encryptInfo);
+                        default -> ciphers.createCipher(this.baseUri, 0, encryptInfo);
+                    };
+                    inputStream = new CipherInputStream(inputStream, cipher);
                 }
 
-                write2File(inputStream,filePath,taskUnit);
+                write2File(inputStream,buffer,filePath,taskUnit);
             } catch (Exception e) {
                 if (num < retry) {
                     taskUnit.setMessage("retry %d/%d".formatted(num,retry));
-                    start(num + 1, taskUnit);
+                    num++;
+                    start(buffer, taskUnit);
                 } else {
                     throw e;
                 }
@@ -341,15 +352,13 @@ public class Downloader {
         }
 
 
-        private void write2File(InputStream inputStream, Path targetFile,TaskUnit unit) throws IOException {
-            byte[] buffer = DLThreadContext.current().getBuffer();
+        private void write2File(InputStream inputStream,byte[] buffer, Path targetFile,TaskUnit unit) throws IOException {
             try (InputStream in=inputStream;
                  OutputStream out=Files.newOutputStream(targetFile, StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING)){
-
                 int dataRead;
                 while ((dataRead= in.read(buffer))!=-1){
                     out.write(buffer,0,dataRead);
-                    out.flush();
+//                    out.flush();
                     unit.stepBy(dataRead);
                 }
                 if (unit.getTotal()-unit.getCurrent()<=16) {

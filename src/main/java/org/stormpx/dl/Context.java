@@ -125,8 +125,6 @@ public class Context {
         private URI uri;
         private ByteRange byteRange;
 
-        //false: init true: segment
-        private boolean segment;
 
         public MediaEntry(EncryptInfo encryptInfo,Segment segment, MediaEntry prevEntry) {
             this.encryptInfo = encryptInfo;
@@ -141,7 +139,6 @@ public class Context {
             }
             this.name=segment.getTitle();
             this.uri=baseUri.resolve(segment.getUri());
-            this.segment=true;
         }
 
         public MediaEntry(EncryptInfo encryptInfo,InitInfo initInfo){
@@ -149,12 +146,10 @@ public class Context {
             this.element=initInfo;
             this.uri=baseUri.resolve(initInfo.getUri());
             this.byteRange=initInfo.getByteRange();
-            this.segment=false;
-
         }
 
         public boolean isSegment() {
-            return segment;
+            return element instanceof Segment;
         }
 
         public String getName() {

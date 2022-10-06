@@ -23,6 +23,10 @@ public class EncryptInfo implements PlayListElement {
         this.keyFormatVersions = keyFormatVersions;
     }
 
+    public boolean shouldDecrypt(){
+        return method!= EncryptMethod.NONE;
+    }
+
     public EncryptMethod getMethod() {
         return method;
     }

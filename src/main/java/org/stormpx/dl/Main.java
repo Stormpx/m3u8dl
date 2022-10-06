@@ -60,7 +60,7 @@ public class Main {
     }
 
     public static void main(String[] args){
-//        DL.DEBUG=true;
+        //        DL.DEBUG=true;
         String userAgent=null;
         URI baseUri=null;
         int thread=Runtime.getRuntime().availableProcessors();
@@ -144,13 +144,13 @@ public class Main {
             //            System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(thread));
             DL.perrln("threads: "+thread);
             DL.perrln("workDir: "+workDir);
-            ExecutorService threadPool = Executors.newFixedThreadPool(thread);
+//            ExecutorService threadPool = Executors.newFixedThreadPool(thread);
             Http.build(proxyAddr,userAgent,Executors.newSingleThreadExecutor(r-> {
                 var t= new Thread(r,"HttpClient-Thread");
                 t.setDaemon(true);
                 return t;
             }));
-            Downloader downloader = new Downloader(baseUri,workDir,threadPool)
+            Downloader downloader = new Downloader(baseUri,workDir,thread)
                     .setRetry(retry)
                     .setReload(reload)
                     .setConcat(concat)
@@ -168,7 +168,7 @@ public class Main {
                 }
             }
             //done
-            threadPool.shutdown();
+//            threadPool.shutdown();
         } catch (Throwable e){
             if (DL.DEBUG) {
                 e.printStackTrace();

@@ -7,12 +7,13 @@ plugins {
 group 'org.stormpx'
 version '0.2.0'
 
-sourceCompatibility = 17
+sourceCompatibility = 19
 
 ext {
     mainclass = 'org.stormpx.dl.Main'
 }
 
+compileJava.options.compilerArgs = ["--enable-preview","--add-modules","jdk.incubator.concurrent"]
 compileJava.options.encoding = 'UTF-8'
 
 tasks.withType(JavaCompile) {
@@ -27,6 +28,7 @@ task getVersion {
 
 application {
     mainClass = project.ext.mainclass
+    applicationDefaultJvmArgs = ["--enable-preview","--add-modules","jdk.incubator.concurrent"]
 }
 
 //shadowJar {

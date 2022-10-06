@@ -76,7 +76,7 @@ public class TaskUnit implements Runnable {
         return done;
     }
 
-    public Exception getException() {
+    public Exception ex() {
         return exception;
     }
 
