@@ -68,6 +68,7 @@ public class Main {
         int retry=10;
         boolean reload=false;
         boolean concat=false;
+        boolean nocheck=false;
         URI proxyAddr=null;
         Path workDir= Paths.get(System.getProperty("user.dir"));
 
@@ -133,6 +134,9 @@ public class Main {
                     case "--concat":
                         concat=true;
                         continue;
+                    case "--nocheck":
+                        nocheck=true;
+                        continue;
                     default:
                         if (arg.startsWith("-"))
                             DL.perrln("unrecognized option '"+arg+"'");
@@ -154,6 +158,7 @@ public class Main {
                     .setRetry(retry)
                     .setReload(reload)
                     .setConcat(concat)
+                    .setNocheck(nocheck)
                     .setMaximumSegment(maxSegment)
                     ;
 

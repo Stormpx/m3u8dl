@@ -46,6 +46,15 @@ public class M3u8Parser {
 
     private String versionTag;
 
+    private boolean check=true;
+
+    public M3u8Parser() {
+    }
+
+    public M3u8Parser(boolean check) {
+        this.check = check;
+    }
+
     private boolean isMediaTag(String line){
         if (!isComment(line))
             return false;
@@ -329,9 +338,12 @@ public class M3u8Parser {
                 }
                 this.segment.setUri(line);
 
-                if (this.playListFile.getTargetDuration()!=null&& this.playListFile.getTargetDuration()<this.segment.getDuration()){
-                    throw new IllegalStateException("duration of media segment must be <= target duration");
+                if (check){
+                    if (this.playListFile.getTargetDuration()!=null&& this.playListFile.getTargetDuration()<this.segment.getDuration()){
+                        throw new IllegalStateException("duration of media segment must be <= target duration");
+                    }
                 }
+
 
                 this.playListFile.addElement(this.segment);
                 this.previous=this.segment;

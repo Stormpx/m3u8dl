@@ -18,6 +18,7 @@ import javax.crypto.CipherInputStream;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.*;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -30,6 +31,8 @@ public class Downloader {
     private int retry=10;
     private boolean reload =false;
     private boolean concat =false;
+
+    private boolean nocheck=false;
     private int maximumSegment =Integer.MAX_VALUE;
     private DLCiphers ciphers;
 
@@ -47,6 +50,11 @@ public class Downloader {
 
     public Downloader setReload(boolean reload) {
         this.reload = reload;
+        return this;
+    }
+
+    public Downloader setNocheck(boolean nocheck) {
+        this.nocheck = nocheck;
         return this;
     }
 
@@ -81,7 +89,7 @@ public class Downloader {
 
         URI base=uri.resolve("");
         URI relativeUri = base.relativize(uri);
-        String dirName = Strs.removeExt(relativeUri.toString());
+        String dirName = Strs.removeExt(relativeUri.getPath());
 
         DL.perrln("uri: "+uri);
         download(this.baseUri!=null?this.baseUri:base,null,dirName,()->{
@@ -92,7 +100,7 @@ public class Downloader {
             if (!reqResult.isM3u8File()){
                 throw new IllegalStateException(String.format("'%s' is not a m3u8 file", uri));
             }
-            return new M3u8Parser().parse(new InputStreamReader(reqResult.getInputStream()));
+            return new M3u8Parser(!nocheck).parse(new InputStreamReader(reqResult.getInputStream()));
         });
 
     }
@@ -112,20 +120,20 @@ public class Downloader {
         DL.perrln("filePath: "+ path);
 
         download(baseUri,null,dirName,()->{
-            return new M3u8Parser().parse(Files.newBufferedReader(path));
+            return new M3u8Parser(!nocheck).parse(Files.newBufferedReader(path));
         });
     }
 
     private void download(URI baseUri,Path workPath, String dirName, PlayListProvider playListProvider) throws Throwable {
         if (baseUri==null)
             baseUri=this.baseUri;
-        if (dirName.length()>128)
-            dirName=dirName.substring(0,128);
+        if (dirName.length()>110)
+            dirName=dirName.substring(0,110);
 
         if (workPath==null)
             workPath=this.workPath;
 
-        Path downloadPath = workPath.resolve(dirName);
+        Path downloadPath = workPath.resolve(dirName+"_"+Instant.now().getEpochSecond());
         DL.createDir(downloadPath);
 
         PlayList playList = playListProvider.getFile();
@@ -158,7 +166,7 @@ public class Downloader {
                     if (!reqResult.isM3u8File()) {
                         throw new IllegalStateException(String.format("'%s' is not a m3u8 file", finalUri));
                     }
-                    return new M3u8Parser().parse(new InputStreamReader(reqResult.getInputStream()));
+                    return new M3u8Parser(!nocheck).parse(new InputStreamReader(reqResult.getInputStream()));
                 });
 
             }
@@ -255,7 +263,8 @@ public class Downloader {
 
 
     private void concat(List<Context.Entry> entries, Path dirPath) throws IOException {
-        Path tsPath = dirPath.getParent().resolve(dirPath.getFileName() + ".ts");
+        String tpl = "%s.%s";
+        Path tsPath = dirPath.getParent().resolve(tpl.formatted(dirPath.getFileName(),"ts"));
         File allInOneFile= tsPath.toFile();
         byte[] buffer=new byte[16*1024];
         try (OutputStream out = new FileOutputStream(allInOneFile)){
@@ -272,7 +281,7 @@ public class Downloader {
             DL.perrln("concat done..");
         }
 
-        if (DL.remuxing(tsPath, dirPath.getParent().resolve(dirPath.getFileName()+".mp4"))){
+        if (DL.remuxing(tsPath, dirPath.getParent().resolve(tpl.formatted(dirPath.getFileName(),"mp4")))){
             DL.perrln("remuxing success..");
             allInOneFile.delete();
         }
