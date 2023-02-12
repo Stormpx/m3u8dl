@@ -20,16 +20,15 @@ public class Main {
             System.exit(128);
         }
         var str=args[index];
-        int i = 0;
         try {
-            i = Integer.parseInt(str);
+            int i = Integer.parseInt(str);
             if (i<=0){
                 DL.perrln(option+": expected argument > 0");
             }
+            return i;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(option+": invalid number of "+str);
         }
-        return i;
     }
 
     public static String getString(String option,String[] args,int index){
@@ -77,72 +76,32 @@ public class Main {
             for (; readIdx < args.length ; readIdx++) {
                 String arg = args[readIdx];
                 switch (arg) {
-                    case "-h":
-                    case "--help":
-                        printHelps();
-                        break;
-                    case "-b":
-                    case "--baseUrl":
-                        String baseUrl = getString(arg,args, ++readIdx);
-                        if (!baseUrl.endsWith("/"))
-                            baseUrl=baseUrl+"/";
-                        baseUri=URI.create(baseUrl);
-                        continue;
-                    case "--debug":
-                        DL.DEBUG=true;
-                        continue;
-                    case "-r":
-                    case "--reload":
-                        reload = true;
-                        continue;
-                    case "-t":
-                    case "--thread":
-                        Integer threadN = getInt(arg,args, ++readIdx);
-                        if (threadN!=null){
-                            thread=threadN;
-                        }
-                        continue;
-                    case "--proxy":
-                        String proxyStr=getString(arg,args,++readIdx);
-                        proxyAddr=new URI(proxyStr);
-                        continue;
-                    case "--retry":
-                        Integer retryN = getInt(arg,args, ++readIdx);
-                        if (retryN!=null){
-                            retry=retryN;
-                        }
-                    case "-ua":
-                    case "--userAgent":
-                        userAgent= getString(arg,args, ++readIdx);
-                        continue;
-                    case "-d":
-                    case "--workDir":
-                        try {
-                            String path = getString(arg,args, ++readIdx);
-                            workDir=Path.of(path);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                        continue;
-                    case "-m":
-                    case "--maxSegment":
-                        Integer m = getInt(arg,args, ++readIdx);
-                        if (m!=null){
-                            maxSegment=m;
-                        }
-                        continue;
-                    case "--concat":
-                        concat=true;
-                        continue;
-                    case "--nocheck":
-                        nocheck=true;
-                        continue;
-                    default:
-                        if (arg.startsWith("-"))
-                            DL.perrln("unrecognized option '"+arg+"'");
-                        else if (readIdx== args.length-1)
-                            SYS_IN=false;
-
+                    case "-h", "--help" -> printHelps();
+                    case "-b", "--baseUrl" -> {
+                        String baseUrl = getString(arg, args, ++readIdx);
+                        if (!baseUrl.endsWith("/")) baseUrl = baseUrl + "/";
+                        baseUri = URI.create(baseUrl);
+                    }
+                    case "--debug" -> DL.DEBUG = true;
+                    case "-r", "--reload" -> reload = true;
+                    case "-t", "--thread" -> thread = getInt(arg, args, ++readIdx);
+                    case "--proxy" -> {
+                        String proxyStr = getString(arg, args, ++readIdx);
+                        proxyAddr = new URI(proxyStr);
+                    }
+                    case "--retry" -> retry = getInt(arg, args, ++readIdx);
+                    case "-ua", "--userAgent" -> userAgent = getString(arg, args, ++readIdx);
+                    case "-d", "--workDir" -> {
+                        String path = getString(arg, args, ++readIdx);
+                        workDir = Path.of(path);
+                    }
+                    case "-m", "--maxSegment" -> maxSegment = getInt(arg, args, ++readIdx);
+                    case "--concat" -> concat = true;
+                    case "--nocheck" -> nocheck = true;
+                    default -> {
+                        if (arg.startsWith("-")) DL.perrln("unrecognized option '" + arg + "'");
+                        else if (readIdx == args.length - 1) SYS_IN = false;
+                    }
                 }
             }
             //            System.setProperty("jdk.httpclient.connectionPoolSize", String.valueOf(thread));
